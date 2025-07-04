@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/data:/app/data
+      - ./backend/main.py:/app/main.py
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+      - ./client/vite.config.ts:/app/vite.config.ts
+    ports:
+      - "5191:5191"
+    environment:
+      - NODE_ENV=development

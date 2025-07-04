@@ -1,0 +1,41 @@
+/*
+ * vis.css
+ *
+ * @project: ts-signature
+ * @author: Juntong Chen (dev@jtchen.io)
+ * @created: 2025-02-04 20:06:52
+ * @modified: 2025-02-12 01:01:57
+ *
+ * Copyright (c) 2025 Juntong Chen. All rights reserved.
+ */
+
+.gray-axis {
+  font-size: 10px;
+  /* font-family: var(--font-mono); */
+
+  & path {
+    stroke: #ccc;
+  }
+
+  & line {
+    stroke: #ccc;
+  }
+}
+
+.cross-text {
+  font-size: 15px;
+  font-family: var(--font-mono);
+}
+
+.cluster-container {
+
+  @apply transition-all duration-200 cursor-pointer;
+
+  &:hover {
+
+    @apply bg-gray-100;
+    > * .overflow-blocker {
+      @apply bg-gray-100 fill-gray-100;
+    }
+  }
+}

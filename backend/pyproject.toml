@@ -1,0 +1,33 @@
+[project]
+authors = [
+    {name = "Yu-Chia Huang", email = "ychihuang@ucdavis.edu" },
+    {name = "Juntong Chen", email = "jtchen@ucdavis.edu"}
+]
+description = "time series signature server"
+name = "backend"
+requires-python = ">= 3.11"
+version = "0.1.0"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+
+[tool.pixi.tasks]
+dev = "python main.py"
+
+[tool.pixi.dependencies]
+aeon = ">=1.0.0,<2"
+fastapi = "==0.111.1"
+fastapi-cli = ">=0.0.7,<0.0.8"
+minisom = ">=2.3.0,<3"
+numpy = ">=2.0.2,<3"
+pandas = ">=2.2.3,<3"
+pydantic = ">=2.10.5,<3"
+pyts = ">=0.13.0,<0.14"
+scikit-learn = ">=1.5.2,<2"
+uvicorn = ">=0.34.0,<0.35"
+matplotlib = ">=3.10.0,<4"

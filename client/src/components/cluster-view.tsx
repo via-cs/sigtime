@@ -88,15 +88,6 @@ export default function ClusterView(props: IClusterViewProps) {
             }))}
           >Union</Button>
         </ButtonGroup>
-
-        {/* <Button sx={{height: '24px'}} variant={'outlined'}
-          disabled={!selection.shapelets}
-          onClick={() => {
-            setSelection(produce((draft) => {
-              draft.shapelets = undefined;
-            }));
-          }}
-        >Cancel Selection</Button> */}
       </div>
       <div className={'w-full flex flex-wrap gap-2 flex-1 overflow-y-auto justify-start'}>
 

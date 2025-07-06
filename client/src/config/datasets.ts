@@ -92,30 +92,6 @@ export const datasetConfig: IDatasetConfig[] = [
     negValue: '0',
     posLabel: 'Normal',
     negLabel: 'Abnormal',
-  },
-  // {
-  //   name: 'Coffee',
-  //   displayName: 'Coffee',
-  //   posValue: 0,
-  //   negValue: 1,
-  //   posLabel: 'Robusta',
-  //   negLabel: 'Aribica',
-  // },
-  // {
-  //   name: 'BirdChicken',
-  //   displayName: 'Bird Chicken',
-  //   posValue: 1,
-  //   negValue: 2,
-  //   posLabel: 'Bird',
-  //   negLabel: 'Chicken',
-  // },
-  // {
-  //   name: 'Night',
-  //   displayName: 'Night',
-  //   posValue: 0,
-  //   negValue: 1,
-  //   posLabel: 'Normal',
-  //   negLabel: 'Abnormal',
-  // },
+  }
 
 ];

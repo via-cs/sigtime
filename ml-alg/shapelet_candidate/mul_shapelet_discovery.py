@@ -35,19 +35,15 @@ class ShapeletDiscover():
     def set_window_size(self, window_size):
         self.window_size = window_size
 
-    def get_shapelet_info(self, number_of_shapelet, p=0.0, pi=0.0):
+    def get_shapelet_info(self, number_of_shapelet, p=0.1, pi=0.1):
         if number_of_shapelet == 0:
             number_of_shapelet = 1
-
+        
         list_shapelet = None
         for i in range(len(self.list_group_ppi)):
             list_ppi = np.concatenate(self.list_group_ppi[i])
-            list_group_shapelet = pstsm.find_c_shapelet_non_overlab(list_ppi, number_of_shapelet, p=p, p_inner=pi, len_ts=self.len_of_ts)
-            # sort_list_ppi = np.asarray(list_ppi[list_ppi[:, 3].argsort()]) 
-            # sort_list_ppi = np.asarray(list_ppi[list_ppi[:, 3].argsort()[::-1]])
+            list_group_shapelet = pstsm.find_c_shapelet_non_overlap(list_ppi, number_of_shapelet, p=p, p_inner=pi)
             list_group_shapelet = np.asarray(list_group_shapelet)
-            # list_group_shapelet = sort_list_ppi[:number_of_shapelet]
-            # list_group_shapelet = list_group_shapelet[list_group_shapelet[:, 3].argsort()]
             if list_shapelet is None:
                 list_shapelet = list_group_shapelet
             else:
@@ -59,17 +55,18 @@ class ShapeletDiscover():
         if number_of_shapelet == 0:
             number_of_shapelet = 1
 
-        list_shapelet = None
+        list_shapelet = np.empty((0, 6))
+        # list_shapelet = None
         for i in range(len(self.list_group_ppi)):
             for d in range(self.dim):
                 list_ppi = self.list_group_ppi[i][d]
-                list_group_shapelet = pstsm.find_c_shapelet_non_overlab(list_ppi, number_of_shapelet)
+                list_group_shapelet = pstsm.find_c_shapelet_non_overlap(list_ppi, number_of_shapelet)
                 list_group_shapelet = np.asarray(list_group_shapelet)
                 list_group_shapelet = list_group_shapelet[list_group_shapelet[:, 1].argsort()]
-                if list_shapelet is None:
-                    list_shapelet = list_group_shapelet
-                else:
-                    list_shapelet = np.concatenate((list_shapelet,list_group_shapelet),axis=0)
+                # if list_shapelet is None:
+                #     list_shapelet = list_group_shapelet
+                # else:
+                list_shapelet = np.concatenate((list_shapelet,list_group_shapelet),axis=0)
 
         return list_shapelet
 

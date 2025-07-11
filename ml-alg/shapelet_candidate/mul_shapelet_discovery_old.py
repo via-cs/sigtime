@@ -81,7 +81,7 @@ class ShapeletDiscover():
         time1 = time.time()
         for p in range(len(self.train_data)):
             t2 = self.train_data[p][d] # d is dimension
-            matrix_1, matrix_2 = auto_pisd.calculate_matrix(t1, t2, self.window_size)
+            matrix_1, _ = auto_pisd.calculate_matrix(t1, t2, self.window_size)
             pdm[ts_pos * 100000 + p] = matrix_1
         print("T1: %s" % (time.time() - time1))
         time1 = time.time()

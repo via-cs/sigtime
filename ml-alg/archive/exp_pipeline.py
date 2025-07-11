@@ -14,8 +14,8 @@ from tslearn.clustering import TimeSeriesKMeans
 from sklearn.metrics import log_loss
 from sklearn.preprocessing import StandardScaler
 
-from preterm_preprocessing.preterm_preprocessing import preterm_pipeline
-from public_preprocessing.public_preprocessing import public_pipeline
+from preprocessing.preterm_preprocessing import preterm_pipeline
+from preprocessing.public_preprocessing import public_pipeline
 from synthetic.synthetic_preprocessing import synthetic_pipeline
 from shapelet_candidate.mul_shapelet_discovery import ShapeletDiscover
 from src.learning_shapelets import LearningShapelets as LearningShapeletsFCN
@@ -23,7 +23,6 @@ from src.learning_shapelets_sliding_window import LearningShapelets as LearningS
 from src.vanilla_transformer import Vanilla
 from src.fe_shape_joint import JointTraining
 from pyts.classification import BOSSVS # only univariate format
-from src.fe_shape_joint import feature_extraction_selection, extraction_pipeline
 from numpy.lib.stride_tricks import sliding_window_view
 import tsfel
 from utils.evaluation_and_save import eval_results 
@@ -53,6 +52,7 @@ def torch_dist_ts_shapelet(ts, shapelet, cuda=True):
     # hard min compared to soft-min from the paper
     d_min, d_argmin = torch.min(dists, 1)
     return (d_min.cpu().detach().numpy(), d_argmin.cpu().detach().numpy())
+
 
 def shapelet_initialization(
     X_train, y_train, config, num_classes=2, dataset='preterm', mode='pips', version=''
@@ -161,21 +161,21 @@ def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
             }
             i += 1
             output_shapelet.append(shape_info)
-    
     match_position = []
     min_distance = []
+    min_distance_norm = []
     for i in range(len(output_shapelet)):
-        
         d_min, pos_start = torch_dist_ts_shapelet(X_all, output_shapelet[i]['wave'])
         pos_end = np.zeros(pos_start.shape)
         pos_end = pos_start + output_shapelet[i]['len']
         pos = np.concatenate((pos_start, pos_end), axis=1)
         pos = np.expand_dims(pos, 0)
         match_position.append(pos)
-        min_distance.append(d_min)
-    
+        min_distance.append(d_min) # Normalize distance by shapelet length
+        min_distance_norm.append(d_min / len(output_shapelet[i]['wave']))
     match_position = np.concatenate(match_position)
     min_distance = np.concatenate(min_distance, axis=1)
+    min_distance_norm = np.concatenate(min_distance_norm, axis=1)
     print(min_distance.shape)
     match_position = np.transpose(match_position, (1, 0, 2))
     
@@ -191,11 +191,13 @@ def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
     # Sort output_shapelet based on 'gain'
     output_shapelet = sorted(output_shapelet, key=lambda x: x['gain'], reverse=True)
     output_shapelet = output_shapelet[:10]  # Keep only the top 10 shapelets based on gain
-    output_dir = f"./data/{dataset}"
+    output_dir = f"./data/{dataset}_new"
     
     os.makedirs(output_dir, exist_ok=True)
     min_distance_df = pd.DataFrame(min_distance[:, :10])
     min_distance_df.to_csv(os.path.join(output_dir, "shapelet_transform.csv"), index=False)
+    min_distance_norm_df = pd.DataFrame(min_distance_norm[:, :10])
+    min_distance_norm_df.to_csv(os.path.join(output_dir, "shapelet_transform_dist.csv"), index=False)
     X_all_df = pd.DataFrame(X_all.reshape(X_all.shape[0], -1))
     X_all_df.to_csv(os.path.join(output_dir, "X_train.csv"), index=False)
     y_all_df = pd.DataFrame(y_all, columns=['label'])
@@ -602,7 +604,7 @@ if __name__=='__main__':
             'val_ratio': 0.2,
             'norm_std': 'minmax',
             'norm_mode': 'local_before',
-            'seq_min': 15,
+            'seq_min': 5,
             'pad_min': 3, 
             'step_min': 1,
         },

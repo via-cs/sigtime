@@ -1,9 +1,6 @@
 import os
-import sys 
+import sys
 sys.path.insert(0, os.path.abspath('../'))
-sys.path.insert(0, os.getcwd())
-
-
 import json
 import numpy as np
 import pandas as pd
@@ -36,9 +33,10 @@ if __name__ == "__main__":
     print('filtering...')
     config = args.__dict__
     print(config)
-    model_data = pd.read_csv('../data/processed_clinical_data_duplicate.csv')
-    ID_label = pd.read_excel('../data/case controls PTB 02072025.xlsx', sheet_name='Sheet4')
-    ID_match = pd.read_excel('../data/case controls PTB 02072025.xlsx', sheet_name='Sheet2')
+    model_data = pd.read_csv('./data/processed_clinical_data_duplicate.csv') # sheet matches the strip data and detailed metadata
+    ID_label = pd.read_excel('./data/case controls PTB 02072025.xlsx', sheet_name='Sheet4') # label with encounter date and delivery date
+    ID_match = pd.read_excel('./data/case controls PTB 02072025.xlsx', sheet_name='Sheet2') # label to match mother MRN to obfuscated MRN
+    
     model_data['EncDate_ShiftedDate'] = pd.to_datetime(model_data['EncDate_ShiftedDate'], errors='coerce')
     if args.filter_mode == 'no_contract':
         ID_label = ID_label[ID_label['Label']!='PTC_NoPTB']
@@ -48,18 +46,16 @@ if __name__ == "__main__":
     ID_label['Encounter_date'] = pd.to_datetime(ID_label['Encounter_date'], errors='coerce')
     ID_label['Delivery_date'] = pd.to_datetime(ID_label['Delivery_date'], errors='coerce')
     
-    ID_sheet_merge = ID_label.merge(ID_match, on=['Mother_MRN', ], how="left", suffixes=('_label', '_match'))
-    ID_sheet_merge['Mother_Obfus_MRN'] = ID_sheet_merge['Mother_Obfus_MRN_label'].fillna(ID_sheet_merge['Mother_Obfus_MRN_match'])
-    ID_filled = ID_sheet_merge[['Mother_MRN', 'Mother_Obfus_MRN', 'Delivery_date', \
-        'Encounter_date', 'Delivery_GA', 'Label', 'PTB', 'Preterm_contractions_on_toco',\
-        'Admission']]
-    ID_filled.to_csv("../data/ID_filled.csv", index=False)
+    ID_sheet_merge = ID_label.merge(ID_match, on=['Mother_MRN', ], how="left", suffixes=('_label', '_match')) # merge the label and match sheets
+    ID_sheet_merge['Mother_Obfus_MRN'] = ID_sheet_merge['Mother_Obfus_MRN_label'].fillna(ID_sheet_merge['Mother_Obfus_MRN_match']) # fill the obfuscated MRN with the match sheet
+    ID_filled = ID_sheet_merge[['Mother_MRN', 'Mother_Obfus_MRN', 'Delivery_date', 'Encounter_date', 
+                                'Delivery_GA', 'Label', 'PTB', 'Preterm_contractions_on_toco', 'Admission']] # keep only the relevant columns
+    ID_filled.to_csv("./data/ID_filled.csv", index=False) # 
     
     model_data['row_number'] = model_data.index
-    # ID_filled['Delivery_GA'] = ID_filled['Delivery_GA'].astype(str)
     ID_filled = ID_filled.copy()  # This ensures it's not a slice
     ID_filled.loc[:, 'Delivery_GA_parse'] = ID_filled['Delivery_GA'].apply(parse_weekday_format)
-    ID_filled['Pregnant_date'] = ID_filled['Delivery_date'] - ID_filled['Delivery_GA_parse']
+    ID_filled['Pregnant_date'] = ID_filled['Delivery_date'] - ID_filled['Delivery_GA_parse'] # calculate the pregnant date from delivery date and GA
     
     linked_data = pd.merge(model_data, ID_filled, on=['Mother_Obfus_MRN', ], how="inner")
     filtered_data = linked_data[(linked_data['EncDate_ShiftedDate'] >= linked_data['Pregnant_date']) \
@@ -71,10 +67,16 @@ if __name__ == "__main__":
         filtered_data_keep = filtered_data
     elif config['filter_mode'] == 'last':
         filtered_data_keep = filtered_data.loc[filtered_data.groupby('Mother_Obfus_MRN')['EncDate_ShiftedDate'].idxmax()]
-    else:
-        filtered_data_keep = filtered_data.groupby('Mother_Obfus_MRN').apply(
-            lambda x: x.nlargest(2, 'EncDate_ShiftedDate').iloc[-1]
-        ).reset_index(drop=True)
+    elif config['filter_mode'] == 'last2':
+        # Keep only the second-to-last record for each mother
+        def get_second_to_last(df):
+            if len(df) >= 2:
+                return df.nlargest(2, 'EncDate_ShiftedDate').nsmallest(1, 'EncDate_ShiftedDate')
+            else:
+                return df  # Return the last (only) record if only one exists
+        filtered_data_keep = filtered_data.groupby('Mother_Obfus_MRN', group_keys=False).apply(get_second_to_last).reset_index(drop=True)
+    else:  # fallback, keep all
+        filtered_data_keep = filtered_data
         
     print(filtered_data_keep)
     with open("../data/strips_data.json", "r") as f:

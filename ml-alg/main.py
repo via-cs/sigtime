@@ -1,5 +1,5 @@
 import os
-from exp_pipeline import exp
+from pipeline import pipeline
 from utils.evaluation_and_save import save_results_to_csv
 import argparse
 parser = argparse.ArgumentParser()
@@ -86,10 +86,10 @@ recall_list = []
 precision_list = []
 val_loss_list = []
 elapsed_list = []
-for j in range(10):
-    elapsed, results, val_loss = exp(
+for j in range(1):
+    elapsed, results, val_loss, shapetime = pipeline(
         config, datatype=args.datatype, 
-        dataset=args.dataset, version=args.version
+        dataset=args.dataset, version=args.version,
     )
     acc_list.append(results['accuracy'])
     precision_list.append(results['precision'])

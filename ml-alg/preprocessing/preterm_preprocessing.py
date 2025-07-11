@@ -32,6 +32,7 @@ def preterm_pipeline(
     - meta_path: Path to the metadata CSV file, including labeling information.
     - strip_path: Path to the JSON file containing the time series waveforms.
     '''
+    
     if not config:
         config = {
             'test_ratio': 0.2,
@@ -113,45 +114,6 @@ def preterm_pipeline(
     # Save the dataset to disk
     np.savez(data_path, **data)
     return data
-    
-def detect_anomalous_start(signal, dynamic_threshold=0.1):
-    """
-    Detect if the beginning of a waveform has a different distribution than the rest.
-    
-    - Uses statistical tests and change-point detection.
-    - The threshold determines what fraction of the signal is considered 'beginning'.
-    """
-    if len(signal) < 50:  # Skip too short waveforms
-        return False
-    
-    # Dynamically determine the "beginning" range
-    # start_range = max(50, int(len(signal) * dynamic_threshold))  # At least 50 points
-    start_range = 4000 # At least 50 points
-    
-    start_segment = np.array(signal[:start_range])
-    rest_segment = np.array(signal[start_range:])
-
-    if len(rest_segment) == 0:  # If the waveform is too short after trimming
-        return False
-    
-    # Statistical comparison
-    mean_diff = abs(np.mean(start_segment) - np.mean(rest_segment))
-    std_diff = abs(np.std(start_segment) - np.std(rest_segment))
-
-    # Kolmogorov-Smirnov Test (check if distributions are different)
-    ks_stat, ks_pval = stats.ks_2samp(start_segment, rest_segment)
-
-    # Change-Point Detection (detect if there's a major shift)
-    algo = rpt.Binseg(model="l2").fit(np.array(signal))
-    change_points = algo.predict(n_bkps=1)  # Detect 1 breakpoint
-
-    # Conditions for anomaly detection
-    is_anomalous = (mean_diff > np.std(rest_segment) * 2) or \
-                   (std_diff > np.std(rest_segment) * 2) 
-                    # (change_points[0] < start_range * 1.5)  # Change-point occurs early
-                   
-
-    return is_anomalous
 
 def take_mean(series, window_size = mean_window_size):
     n = len(series)
@@ -227,8 +189,8 @@ def segment_time_series_excluding_padding(time_series, label, segment_length,
 def segmentation(
     tocometer, 
     labels, 
-    seq_length = 900,
-    step=60,
+    seq_length = 600,
+    step = 60,
     padding_threshold = 180,
     norm_std='standard', 
     norm_mode='local_before',
@@ -251,14 +213,13 @@ def segmentation(
         if norm_mode=='local_after':
             temp = []
             for i in range(len(segments)):
-                norm_temp, scaler = normalize_data(
+                norm_temp, _ = normalize_data(
                     np.array(segments[i]).reshape(1, -1), 
                     mode=norm_std
                 ) 
                 temp.append(norm_temp)
-                
-            
             all_segments.extend(temp)
+            
         else:
             all_segments.extend(segments)
             
@@ -273,20 +234,15 @@ def mean_std(train_data):
     mean = np.mean(m_len, axis=0)
 
     s_len = np.std(train_data)
-    # std = np.max(s_len, axis=0)
     std = s_len
     
     return mean, std
-
 
 def mean_std_transform(train_data, mean, std):
     '''
     Normalizing based on global mean and std.
     '''
     return (train_data - mean) / std
-
-    
-    
     
 if __name__ == "__main__":
     config = {
@@ -295,23 +251,10 @@ if __name__ == "__main__":
         'norm_std': 'minmax',
         'norm_mode': 'local_before',
     }
-    # preterm_pipeline(
-    #     config=config, 
-    #     meta_path='./data/filtered_clinical_data_v2.csv',
-    #     strip_path='./data/filtered_strips_data_v2.json',
-    #     data_path='./data/preterm_v2.npz'
-    # )    
     preterm_pipeline(
         config=config, 
         meta_path='./data/filtered_clinical_data_v4.csv',
         strip_path='./data/filtered_strips_data_v4.json',
         data_path='./data/preterm_v4.npz'
     )    
-    
-    # preterm_pipeline(
-    #     config=config, 
-    #     meta_path='./data/filtered_clinical_data.csv',
-    #     strip_path='./data/filtered_strips_data.json',
-    #     data_path='./data/preterm.npz'
-    # )    
     

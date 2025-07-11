@@ -3,7 +3,7 @@ def find_c_shapelet(list_ppi, c):
     return sort_list_ppi[-c:]
 
 
-def find_c_shapelet_non_overlab(list_ppi, c, p=0.1, p_inner=0.1, len_ts=100):
+def find_c_shapelet_non_overlap(list_ppi, c, p=0.1, p_inner=0.1, len_ts=100):
     sort_list_ppi = list_ppi[list_ppi[:, 3].argsort()]
     list_group_shapelet = [sort_list_ppi[-1]]
     list_pos = [len(sort_list_ppi)-1]
@@ -12,8 +12,7 @@ def find_c_shapelet_non_overlab(list_ppi, c, p=0.1, p_inner=0.1, len_ts=100):
         s2 = int(sort_list_ppi[i, 1])
         e2 = int(sort_list_ppi[i, 2])
         d2 = int(sort_list_ppi[i, 5])
-        # if e2 - s2 < int(0.0*len_ts) or e2 - s2 > int(0.2*len_ts):
-        #     continue
+
         for j in range(len(list_group_shapelet)):
             s1 = int(list_group_shapelet[j][1])
             e1 = int(list_group_shapelet[j][2])

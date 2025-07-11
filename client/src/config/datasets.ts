@@ -12,14 +12,6 @@
 import {IDatasetConfig} from '@/types';
 
 export const datasetConfig: IDatasetConfig[] = [
-  // {
-  //   name: 'GunPoint',
-  //   displayName: 'Gun Point',
-  //   posValue: 1,
-  //   negValue: 2,
-  //   posLabel: 'Gun',
-  //   negLabel: 'Point',
-  // },
   {
     name: 'Robot',
     displayName: 'Robot',
@@ -36,15 +28,6 @@ export const datasetConfig: IDatasetConfig[] = [
     posLabel: 'Hard',
     negLabel: 'Smooth',
   },
-  // {
-  //   name: 'ECG200',
-  //   displayName: 'ECG 200',
-  //   posValue: '1',
-  //   negValue: '0',
-  //   posLabel: 'Normal',
-  //   negLabel: 'Ischemia',
-  // },
-  
   {
     name: 'preterm',
     displayName: 'Preterm dataset',
@@ -53,14 +36,6 @@ export const datasetConfig: IDatasetConfig[] = [
     posLabel: 'Preterm',
     negLabel: 'No Preterm  ',
   },
-  // {
-  //   name: 'ECG5000_demo',
-  //   displayName: 'ECG 5000 demo',
-  //   posValue: '1',
-  //   negValue: '0',
-  //   posLabel: 'Abnormal',
-  //   negLabel: 'Normal',
-  // },
   {
     name: 'ECG5000_New',
     displayName: 'ECG 5000',
@@ -77,14 +52,6 @@ export const datasetConfig: IDatasetConfig[] = [
     posLabel: 'Normal',
     negLabel: 'Ischemia',
   },
-  // {
-  //   name: 'ECG200_JOINT_20',
-  //   displayName: 'ECG 200 Joint',
-  //   posValue: '1',
-  //   negValue: '0',
-  //   posLabel: 'Normal',
-  //   negLabel: 'Ischemia',
-  // },
   {
     name: 'Strawberry',
     displayName: 'Strawberry',

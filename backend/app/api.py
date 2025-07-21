@@ -110,8 +110,15 @@ async def get_transform_data(
     Get the transformed data. Return a 2D matrix indicating the distance from each instance to each shapelet.
     """
     X_transformed = pd.read_csv(get_data_file(f'{dataset}/shapelet_transform.csv'))
+    with open(get_data_file(f'./{dataset}/output_shapelet.json')) as f:
+        shape_info = json.load(f)
     transformed_value = np.array(X_transformed)
-    normalized_value = (transformed_value - np.min(transformed_value)) / (np.max(transformed_value) - np.min(transformed_value))
+    for i, shape in enumerate(shape_info):
+        wave_length = len(shape['wave'][0])
+        print(wave_length)
+        transformed_value[:, i] = transformed_value[:, i] / wave_length
+    # normalized_value = (transformed_value - np.min(transformed_value)) / (np.max(transformed_value) - np.min(transformed_value))
+    normalized_value = (transformed_value - np.min(transformed_value, axis=0)) / (np.max(transformed_value, axis=0) - np.min(transformed_value, axis=0) + 1e-8)
     return TransformReturnModel(
         max=np.max(transformed_value),
         min=np.min(transformed_value),

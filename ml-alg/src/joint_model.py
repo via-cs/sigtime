@@ -118,3 +118,5 @@ class JointModel(nn.Module):
         final_out = self.linear(transformer_out.mean(dim=1))
         
         return final_out
+
+    

@@ -9,7 +9,39 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from tqdm import tqdm
-
+def dtw_distance(x, y):
+    """
+    x, y: [length]
+    Returns DTW distance (float tensor).
+    """
+    print('x:', x.shape)
+    print('y:', y.shape)
+    n, m = x.size(0), y.size(0)
+    dtw = torch.full((n+1, m+1), float('inf'), device=x.device)
+    dtw[0, 0] = 0
+    for i in range(1, n+1):
+        for j in range(1, m+1):
+            cost = (x[i-1] - y[j-1]).pow(2)
+            print('cost:', cost.shape, type(cost))
+            print(type(dtw[i-1, j]), dtw[i-1, j].shape)
+            print(type(dtw[i, j-1]), dtw[i, j-1].shape)
+            print(type(dtw[i-1, j-1]), dtw[i-1, j-1].shape)
+            min_val = torch.min(torch.stack([dtw[i-1, j], dtw[i, j-1], dtw[i-1, j-1]]))
+            dtw[i, j] = cost + min_val
+    return dtw[n, m]
+def sliding_dtw_all_shapelets(x_windows, shapelets):
+    """
+    x_windows: [num_windows, window_size]
+    shapelets: [num_shapelets, window_size]
+    Returns: [num_shapelets, num_windows] (DTW distances)
+    """
+    num_shapelets = shapelets.size(0)
+    num_windows = x_windows.size(0)
+    out = torch.zeros(num_shapelets, num_windows, device=x_windows.device)
+    for k in range(num_shapelets):
+        for w in range(num_windows):
+            out[k, w] = dtw_distance(x_windows[w], shapelets[k])
+    return out
 class MinEuclideanDistBlock(nn.Module):
     """
     Calculates the euclidean distances of a bunch of shapelets to a data set and performs global min-pooling.
@@ -50,22 +82,34 @@ class MinEuclideanDistBlock(nn.Module):
         @rtype: tensor(num_samples, num_shapelets)
         """
         # unfold time series to emulate sliding window
-       
+        # inp: [batch, in_channels, len_ts]
+        batch, in_channels, len_ts = inp.shape
         x = inp.unfold(2, self.shapelets_size, 1).contiguous()
+         # --- For local y_ ---
         y_ = inp.unfold(2, self.window_size, self.step).contiguous()
-        y_ = y_.unfold(3, self.shapelets_size, self.step).contiguous()
-        
+        # y_: [batch, in_channels, num_large_win, window_size]
+        num_large_win = y_.size(2)
+        out_y = torch.zeros(batch, self.num_shapelets, num_large_win, device=inp.device)
+
+        for i in range(batch):
+            for win in range(num_large_win):
+                # In each large window, extract all sub-windows of shapelet size
+                sub_windows = y_[i, win].unfold(0, self.shapelets_size, self.step)  # [num_subwin, shapelets_size]
+                for k in range(self.num_shapelets):
+                    min_dist = float('inf')
+                    for subwin in range(sub_windows.size(0)):
+                        dist = dtw_distance(sub_windows[subwin], self.shapelets[k])
+                        if dist < min_dist:
+                            min_dist = dist
+                    out_y[i, k, win] = min_dist
+
+        # Now, min over local windows
+        y_min = out_y.min(dim=2)[0]   # [batch, num_shapelets]
+        y_min = y_min.unsqueeze(1)    # [batch, 1, num_shapelets]
+        # --- End of local y_ ---        
         # calculate euclidean distance 
         
         x = torch.cdist(x, self.shapelets, p=2)
-        y_ = torch.cdist(y_, self.shapelets, p=2)
-        # x_min = x.min(dim=-1, keepdim=True)[0]
-        # x_max = x.max(dim=-1, keepdim=True)[0]
-        # y_ = (x - x_min) / (x_max - x_min + 1e-8)
-        y_ = torch.sum(y_, dim=1, keepdim=True) # [batch_size, 1, num_shapelets, seq_len]
-        
-        y_, _ = torch.min(y_, 3)
-
         # add up the distances of the channels in caseof
         # multivariate time series
         # Corresponds to the approach 1 and 3 here: https://stats.stackexchange.com/questions/184977/multivariate-time-series-euclidean-distance
@@ -73,7 +117,7 @@ class MinEuclideanDistBlock(nn.Module):
         # hard min compared to soft-min from the paper
         x, _ = torch.min(x, 3)
         # x, _ = nn.Softmin(x, 3)
-        return x, y_
+        return x, y_min
 
     def get_shapelets(self):
         """

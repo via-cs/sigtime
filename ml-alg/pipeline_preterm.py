@@ -2,6 +2,11 @@
 import os
 import sys
 sys.path.insert(0, os.getcwd())
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
+print(f"Base directory: {BASE_DIR}")
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+
 import time
 import random
 import json
@@ -22,12 +27,11 @@ from numpy.lib.stride_tricks import sliding_window_view
 # self-defined modules
 from preprocessing.preterm_preprocessing import preterm_pipeline
 from preprocessing.public_preprocessing import public_pipeline
-from synthetic.synthetic_preprocessing import synthetic_pipeline
 from shapelet_candidate.mul_shapelet_discovery import ShapeletDiscover
-from src.learning_shapelets import LearningShapelets as LearningShapeletsFCN
+from src.learning_shapelets_DTW import LearningShapelets as LearningShapeletsFCN
 from src.learning_shapelets_sliding_window import LearningShapelets as LearningShapeletsTranformer
-from src.fe_shape_joint import JointTraining
-from src.fe_shape_joint import feature_extraction_selection, extraction_pipeline
+from src.fe_shape_joint_dtw import JointTraining
+from src.fe_shape_joint_dtw import feature_extraction_selection, extraction_pipeline
 from utils.evaluation_and_save import eval_results 
 
 torch.cuda.set_device(0)
@@ -163,6 +167,92 @@ def get_weights_via_kmeans(X, shapelets_size, num_shapelets, n_segments=1000):
     clusters = k_means.cluster_centers_.transpose(0, 2, 1)
     return clusters
 
+def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
+    X_train = data['X_train']
+    X_val = data['X_val']
+    X_test = data['X_test']
+    y_train = data['y_train']
+    y_val = data['y_val']
+    y_test = data['y_test']
+    
+    X_all = np.concatenate((X_train, X_val, X_test), axis=0)
+    y_all = np.concatenate((y_train, y_val, y_test), axis=0)
+    shapelets = model.get_shapelets()
+    
+    i = 0
+    output_shapelet = []
+    for key in sorted(list_shapelets.keys()):
+        for idx in list_shapelets[key]:
+            shape_len = int(key)
+            wave = shapelets[i, :, :shape_len]
+            shape_info = {
+                'len': shape_len,
+                'gain': list_shapelets_meta[idx, 3],
+                'wave': shapelets[i, :, :shape_len]
+            }
+            i += 1
+            output_shapelet.append(shape_info)
+    
+    match_position = []
+    min_distance = []
+    for i in range(len(output_shapelet)):
+        d_min = []
+        pos_start = []
+        for j in range(X_all.shape[0]):
+            d_min_j, pos_start_j = torch_dist_ts_shapelet(X_all[j], output_shapelet[i]['wave'])
+            d_min.append(d_min_j)
+            pos_start.append(pos_start_j)
+        pos_start = np.array(pos_start).reshape(len(pos_start), 1)
+        pos_end = np.zeros(pos_start.shape)
+        pos_end = pos_start + output_shapelet[i]['len']
+        pos = np.concatenate((pos_start, pos_end), axis=1)
+        pos = np.expand_dims(pos, 0)
+        d_min = np.array(d_min).reshape(len(d_min), 1)
+        match_position.append(pos)
+        min_distance.append(d_min)
+    
+    match_position = np.concatenate(match_position)
+    min_distance = np.concatenate(min_distance, axis=1)
+    print(min_distance.shape)
+    match_position = np.transpose(match_position, (1, 0, 2))
+    
+    
+    # Sort match_position based on output_shapelet['gain'] on axis 1
+    gains = np.array([shapelet['gain'] for shapelet in output_shapelet])
+    sorted_indices = np.argsort(gains)[::-1]
+    match_position = match_position[:, sorted_indices, :]
+    min_distance = min_distance[:, sorted_indices]
+    
+    match_position_start = match_position[:, :, 0].reshape(match_position.shape[0], match_position.shape[1])
+    match_position_end = match_position[:, :, 1].reshape(match_position.shape[0], match_position.shape[1])
+    # Sort output_shapelet based on 'gain'
+    output_shapelet = sorted(output_shapelet, key=lambda x: x['gain'], reverse=True)
+    output_shapelet = output_shapelet[:10]  # Keep only the top 10 shapelets based on gain
+    output_dir = f"./data/{dataset}"
+    
+    os.makedirs(output_dir, exist_ok=True)
+    min_distance_df = pd.DataFrame(min_distance[:, :10])
+    min_distance_df.to_csv(os.path.join(output_dir, "shapelet_transform.csv"), index=False)
+    X_all_df = pd.DataFrame(X_all.reshape(X_all.shape[0], -1))
+    X_all_df.to_csv(os.path.join(output_dir, "X_train.csv"), index=False)
+    y_all_df = pd.DataFrame(y_all, columns=['label'])
+    y_all_df.to_csv(os.path.join(output_dir, "label.csv"), index=False)
+    match_start_df = pd.DataFrame(match_position_start[:, :10])
+    match_start_df.to_csv(os.path.join(output_dir, "match_start.csv"), index=False)
+    match_end_df = pd.DataFrame(match_position_end[:, :10])
+    match_end_df.to_csv(os.path.join(output_dir, "match_end.csv"), index=False)
+    output_shapelet_json = [
+        {
+            'len': shapelet['len'],
+            'gain': shapelet['gain'],
+            'wave': shapelet['wave'].tolist()
+        }
+        for shapelet in output_shapelet
+    ]
+
+    with open(os.path.join(output_dir, "output_shapelet.json"), 'w') as f:
+        json.dump(output_shapelet_json, f)
+        
 def train(
     data,
     shapelets_size_and_len,
@@ -263,22 +353,29 @@ def train(
     _, n_channels, len_ts = X_train.shape
     num_classes = len(set(y_train))
     loss_func = nn.CrossEntropyLoss()
-    model = JointTraining(
-        shapelets_size_and_len=shapelets_size_and_len,
-        seq_len=len_ts, 
-        in_channels=n_channels, 
-        loss_func = loss_func, 
-        mode = config['joint_mode'], 
-        num_features=num_features, 
-        window_size=window_size, 
-        step=config['step'],
-        nhead=config['nhead'], 
-        num_layers=config['num_layers'],
-        num_classes=num_classes, 
-        to_cuda = True
-    )
+    # model = JointTraining(
+    #     shapelets_size_and_len=shapelets_size_and_len,
+    #     seq_len=len_ts, 
+    #     in_channels=n_channels, 
+    #     loss_func = loss_func, 
+    #     mode = config['joint_mode'], 
+    #     num_features=num_features, 
+    #     window_size=window_size, 
+    #     step=config['step'],
+    #     nhead=config['nhead'], 
+    #     num_layers=config['num_layers'],
+    #     num_classes=num_classes, 
+    #     to_cuda = True
+    # )
     _, n_channels, len_ts = X_train.shape
     loss_func = nn.CrossEntropyLoss()
+    model = LearningShapeletsFCN(
+        shapelets_size_and_len=shapelets_size_and_len,
+        loss_func=loss_func,
+        in_channels=n_channels,
+        num_classes=num_classes,
+    )
+    
     window_size = max(shapelets_size_and_len.keys())
     t1 = time.time()
     
@@ -287,109 +384,25 @@ def train(
     
     model_path = f'./model/{dataset}_{init_mode}_{version}.pt'
     loss =  model.fit(
-            X_train, X_train_split_filtered, y_train,
-            X_val=data['X_val'], FE_val = X_val_split_filtered, Y_val=y_val,
+            X_train, y_train,
             epochs=config['epochs'],
             batch_size=config['batch_size'],
             shuffle=True, 
             model_path= model_path
     )
-    
+    torch.save(
+        model.model.state_dict(), 
+        os.path.join(DATA_DIR, f'model_dtw_{dataset}.pth')
+    )
     # evaluation
-    y_hat = model.predict(X_test, FE = X_test_split_filtered)
+    y_hat = model.predict(X_test)
     results = eval_results(y_test, y_hat)
     elapsed_time = time.time() - t1
+    store_data(data, dataset, model, list_shapelets_meta, list_shapelets)
     return elapsed_time, results, loss[-1]
 
-def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
-    X_train = data['X_train']
-    X_val = data['X_val']
-    X_test = data['X_test']
-    y_train = data['y_train']
-    y_val = data['y_val']
-    y_test = data['y_test']
-    
-    X_all = np.concatenate((X_train, X_val, X_test), axis=0)
-    y_all = np.concatenate((y_train, y_val, y_test), axis=0)
-    shapelets = model.get_shapelets()
-    
-    i = 0
-    output_shapelet = []
-    for key in sorted(list_shapelets.keys()):
-        for idx in list_shapelets[key]:
-            shape_len = int(key)
-            wave = shapelets[i, :, :shape_len]
-            shape_info = {
-                'len': shape_len,
-                'gain': list_shapelets_meta[idx, 3],
-                'wave': shapelets[i, :, :shape_len]
-            }
-            i += 1
-            output_shapelet.append(shape_info)
-    
-    match_position = []
-    min_distance = []
-    for i in range(len(output_shapelet)):
-        d_min = []
-        pos_start = []
-        for j in range(X_all.shape[0]):
-            d_min_j, pos_start_j = torch_dist_ts_shapelet(X_all[j], output_shapelet[i]['wave'])
-            d_min.append(d_min_j)
-            pos_start.append(pos_start_j)
-        pos_start = np.array(pos_start).reshape(len(pos_start), 1)
-        pos_end = np.zeros(pos_start.shape)
-        pos_end = pos_start + output_shapelet[i]['len']
-        pos = np.concatenate((pos_start, pos_end), axis=1)
-        pos = np.expand_dims(pos, 0)
-        d_min = np.array(d_min).reshape(len(d_min), 1)
-        match_position.append(pos)
-        min_distance.append(d_min)
-    
-    match_position = np.concatenate(match_position)
-    min_distance = np.concatenate(min_distance, axis=1)
-    print(min_distance.shape)
-    match_position = np.transpose(match_position, (1, 0, 2))
-    
-    
-    # Sort match_position based on output_shapelet['gain'] on axis 1
-    gains = np.array([shapelet['gain'] for shapelet in output_shapelet])
-    sorted_indices = np.argsort(gains)[::-1]
-    match_position = match_position[:, sorted_indices, :]
-    min_distance = min_distance[:, sorted_indices]
-    
-    match_position_start = match_position[:, :, 0].reshape(match_position.shape[0], match_position.shape[1])
-    match_position_end = match_position[:, :, 1].reshape(match_position.shape[0], match_position.shape[1])
-    # Sort output_shapelet based on 'gain'
-    output_shapelet = sorted(output_shapelet, key=lambda x: x['gain'], reverse=True)
-    output_shapelet = output_shapelet[:10]  # Keep only the top 10 shapelets based on gain
-    output_dir = f"./data/{dataset}"
-    
-    os.makedirs(output_dir, exist_ok=True)
-    min_distance_df = pd.DataFrame(min_distance[:, :10])
-    min_distance_df.to_csv(os.path.join(output_dir, "shapelet_transform.csv"), index=False)
-    X_all_df = pd.DataFrame(X_all.reshape(X_all.shape[0], -1))
-    X_all_df.to_csv(os.path.join(output_dir, "X_train.csv"), index=False)
-    y_all_df = pd.DataFrame(y_all, columns=['label'])
-    y_all_df.to_csv(os.path.join(output_dir, "label.csv"), index=False)
-    match_start_df = pd.DataFrame(match_position_start[:, :10])
-    match_start_df.to_csv(os.path.join(output_dir, "match_start.csv"), index=False)
-    match_end_df = pd.DataFrame(match_position_end[:, :10])
-    match_end_df.to_csv(os.path.join(output_dir, "match_end.csv"), index=False)
-    output_shapelet_json = [
-        {
-            'len': shapelet['len'],
-            'gain': shapelet['gain'],
-            'wave': shapelet['wave'].tolist()
-        }
-        for shapelet in output_shapelet
-    ]
 
-    with open(os.path.join(output_dir, "output_shapelet.json"), 'w') as f:
-        json.dump(output_shapelet_json, f)
-        
 def pipeline(config, dataset='ECG200', datatype='public', version=''):
-    dataset = 'ECG200'
-    datatype = 'public'
     store_results = False
     
     data_path = os.path.join('./data', f'{dataset}.npz')
@@ -434,6 +447,7 @@ def pipeline(config, dataset='ECG200', datatype='public', version=''):
             list_shapelets=list_shapelets,
             list_shapelets_meta=list_shapelets_meta,
             init_mode='pips',
+            dataset=dataset,
             config=config['model_config'],
             version=version
         )
@@ -448,8 +462,8 @@ def pipeline(config, dataset='ECG200', datatype='public', version=''):
     return elapsed, results, val_loss, shapetime
 if __name__ == "__main__":
     
-    dataset = 'ECG200'
-    datatype = 'public'
+    dataset = 'preterm'
+    datatype = 'private'
     store_results = False
     
     config = {

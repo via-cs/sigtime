@@ -3,13 +3,30 @@ import warnings
 
 import numpy as np
 import torch
-from torch import tensor, nn, optim
-from torch.nn.utils import clip_grad_norm_
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch import tensor, nn
 from torch.utils.data import DataLoader, TensorDataset
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
+import pysdtw
 from tqdm import tqdm
-
+def dtw_distance(x, y):
+    """
+    x: Tensor of shape (len_x,)
+    y: Tensor of shape (len_y,)
+    Returns the DTW distance between x and y.
+    """
+    len_x, len_y = x.size, y.size
+    # print(x.shape, y.shape)
+    dtw = torch.zeros(len_x + 1, len_y + 1, device=x.device) + float('inf')
+    dtw[0, 0] = 0
+    for i in range(1, len_x + 1):
+        for j in range(1, len_y + 1):
+            cost = (x[i-1] - y[j-1]).pow(2)
+            dtw[i, j] = cost + torch.min(torch.stack([
+                dtw[i-1, j],      # insertion
+                dtw[i, j-1],      # deletion
+                dtw[i-1, j-1]     # match
+            ]))
+    return dtw[len_x, len_y]
+    
 class MinEuclideanDistBlock(nn.Module):
     """
     Calculates the euclidean distances of a bunch of shapelets to a data set and performs global min-pooling.
@@ -24,14 +41,12 @@ class MinEuclideanDistBlock(nn.Module):
     cuda : bool
         if true loads everything to the GPU
     """
-    def __init__(self, shapelets_size, num_shapelets, in_channels=1, window_size = 30, step = 1, seq_len=1, to_cuda=True):
+    def __init__(self, shapelets_size, num_shapelets, in_channels=1, to_cuda=True, gamma=1.0):
         super(MinEuclideanDistBlock, self).__init__()
         self.to_cuda = to_cuda
         self.num_shapelets = num_shapelets
         self.shapelets_size = shapelets_size
-        self.window_size = window_size
         self.in_channels = in_channels
-        self.step = step
 
         # if not registered as parameter, the optimizer will not be able to see the parameters
         shapelets = torch.randn(self.in_channels, self.num_shapelets, self.shapelets_size, requires_grad=True)
@@ -40,8 +55,10 @@ class MinEuclideanDistBlock(nn.Module):
         self.shapelets = nn.Parameter(shapelets).contiguous()
         # otherwise gradients will not be backpropagated
         self.shapelets.retain_grad()
+        self.sdtw = pysdtw.SoftDTW(gamma=gamma, dist_func=pysdtw.distance.pairwise_l2_squared, use_cuda=to_cuda)
 
-    def forward(self, inp):
+
+    def forward(self, x):
         """
         1) Unfold the data set 2) calculate euclidean distance 3) sum over channels and 4) perform global min-pooling
         @param x: the time series data
@@ -49,31 +66,56 @@ class MinEuclideanDistBlock(nn.Module):
         @return: Return the euclidean for each pair of shapelet and time series instance
         @rtype: tensor(num_samples, num_shapelets)
         """
-        # unfold time series to emulate sliding window
-       
-        x = inp.unfold(2, self.shapelets_size, 1).contiguous()
-        y_ = inp.unfold(2, self.window_size, self.step).contiguous()
-        y_ = y_.unfold(3, self.shapelets_size, self.step).contiguous()
-        
-        # calculate euclidean distance 
-        
-        x = torch.cdist(x, self.shapelets, p=2)
-        y_ = torch.cdist(y_, self.shapelets, p=2)
-        # x_min = x.min(dim=-1, keepdim=True)[0]
-        # x_max = x.max(dim=-1, keepdim=True)[0]
-        # y_ = (x - x_min) / (x_max - x_min + 1e-8)
-        y_ = torch.sum(y_, dim=1, keepdim=True) # [batch_size, 1, num_shapelets, seq_len]
-        
-        y_, _ = torch.min(y_, 3)
+        # Get all sliding windows of this shapelet size
+        batch, ch, seq_len = x.shape
+        if ch == 1:
+            # Univariate: shapelets [num_shapelets, shapelets_size]
+            shapelets = self.shapelets[0]
+            # ... Use shapelets for DTW, as in earlier code
+        else:
+            # Multivariate: handle accordingly (sum DTW across channels, etc.)
+            raise NotImplementedError("Multivariate DTW not implemented in this example")
 
-        # add up the distances of the channels in caseof
-        # multivariate time series
-        # Corresponds to the approach 1 and 3 here: https://stats.stackexchange.com/questions/184977/multivariate-time-series-euclidean-distance
-        x = torch.sum(x, dim=1, keepdim=True).transpose(2, 3)
-        # hard min compared to soft-min from the paper
-        x, _ = torch.min(x, 3)
-        # x, _ = nn.Softmin(x, 3)
-        return x, y_
+        windows = x.unfold(2, self.shapelets_size, 1).squeeze(1)  # [batch, num_windows, shapelets_size]
+        num_windows = windows.shape[1]
+        windows_reshaped = windows.reshape(-1, self.shapelets_size)  # [N, shapelets_size]
+        N = windows_reshaped.shape[0]
+        M = self.num_shapelets
+
+        # Pairwise all windows vs all shapelets
+        X = windows_reshaped.unsqueeze(1).repeat(1, M, 1).reshape(N*M, self.shapelets_size, 1)
+        Y = shapelets.unsqueeze(0).repeat(N, 1, 1).reshape(N*M, self.shapelets_size, 1)
+
+        dists = self.sdtw(X, Y)  # [N*M]
+        dists = dists.view(N, M)
+        dists = dists.view(batch, num_windows, M)  # [batch, num_windows, num_shapelets]
+
+        # Min-pool over windows for each shapelet
+        min_distances, _ = dists.min(dim=1)
+        min_distances = min_distances.unsqueeze(1)  # [batch, 1, num_shapelets]
+        return min_distances
+        # # unfold time series to emulate sliding window
+        # x = x.unfold(2, self.shapelets_size, 1).contiguous()
+        # # x: [num_samples, in_channels, num_windows, shapelets_size]
+        # # calculate euclidean distance
+        # # x = torch.cdist(x, self.shapelets, p=2)
+        # # x: [num_samples, in_channels, num_windows, shapelets_size]
+        # num_samples, in_channels, num_windows, shapelets_size = x.shape
+        # num_shapelets = self.num_shapelets
+        # distances = torch.zeros(num_samples, num_shapelets, num_windows, device=x.device)
+
+        # # Univariate version
+        # for i in range(num_samples):
+        #     for k in range(num_shapelets):
+        #         shapelet = self.shapelets[:, k, :].squeeze(0)  # [shapelets_size]
+        #         for w in range(num_windows):
+        #             window = x[i, 0, w, :]  # [shapelets_size]
+        #             distances[i, k, w] = dtw_distance(window, shapelet)
+
+        # # Min pooling over all windows for each (sample, shapelet)
+        # min_distances, _ = torch.min(distances, dim=2)
+        # min_distances = min_distances.unsqueeze(1)  # (num_samples, 1, num_shapelets)
+        # return min_distances
 
     def get_shapelets(self):
         """
@@ -333,7 +375,7 @@ class ShapeletsDistBlocks(nn.Module):
     to_cuda : bool
         if true loads everything to the GPU
     """
-    def __init__(self, shapelets_size_and_len,window_size = 30, in_channels=1, step = 1, dist_measure='euclidean', to_cuda=True):
+    def __init__(self, shapelets_size_and_len, in_channels=1, dist_measure='euclidean', to_cuda=True):
         super(ShapeletsDistBlocks, self).__init__()
         self.to_cuda = to_cuda
         self.shapelets_size_and_len = OrderedDict(sorted(shapelets_size_and_len.items(), key=lambda x: x[0]))
@@ -342,11 +384,20 @@ class ShapeletsDistBlocks(nn.Module):
         if dist_measure == 'euclidean':
             self.blocks = nn.ModuleList(
                 [MinEuclideanDistBlock(shapelets_size=shapelets_size, num_shapelets=num_shapelets,
-                                       window_size=window_size, in_channels=in_channels, step=step, to_cuda=self.to_cuda)
+                                       in_channels=in_channels, to_cuda=self.to_cuda)
                  for shapelets_size, num_shapelets in self.shapelets_size_and_len.items()])
-
+        elif dist_measure == 'cross-correlation':
+            self.blocks = nn.ModuleList(
+                [MaxCrossCorrelationBlock(shapelets_size=shapelets_size, num_shapelets=num_shapelets,
+                                          in_channels=in_channels, to_cuda=self.to_cuda)
+                 for shapelets_size, num_shapelets in self.shapelets_size_and_len.items()])
+        elif dist_measure == 'cosine':
+            self.blocks = nn.ModuleList(
+                [MaxCosineSimilarityBlock(shapelets_size=shapelets_size, num_shapelets=num_shapelets,
+                                          in_channels=in_channels, to_cuda=self.to_cuda)
+                 for shapelets_size, num_shapelets in self.shapelets_size_and_len.items()])
         else:
-            raise ValueError(f"dist_measure must be 'euclidean'. Currently set to {dist_measure}.")
+            raise ValueError("dist_measure must be either of 'euclidean', 'cross-correlation', 'cosine'")
 
     def forward(self, x):
         """
@@ -356,14 +407,11 @@ class ShapeletsDistBlocks(nn.Module):
         @return: a distance matrix containing the distances of each shapelet to the time series data
         @rtype: tensor(float) of shape
         """
-        out_trans = torch.tensor([], dtype=torch.float).cuda() if self.to_cuda else torch.tensor([], dtype=torch.float)
-        out_y = torch.tensor([], dtype=torch.float).cuda() if self.to_cuda else torch.tensor([], dtype=torch.float)
+        out = torch.tensor([], dtype=torch.float).cuda() if self.to_cuda else torch.tensor([], dtype=torch.float)
         for block in self.blocks:
-            x_trans, y = block(x)
-            out_trans = torch.cat((out_trans, x_trans), dim=2)
-            out_y = torch.cat((out_y, y), dim=3)
+            out = torch.cat((out, block(x)), dim=2)
 
-        return out_trans, out_y
+        return out
 
     def get_blocks(self):
         """
@@ -563,25 +611,18 @@ class LearningShapeletsModel(nn.Module):
     to_cuda : bool
         if true loads everything to the GPU
     """
-    def __init__(self, shapelets_size_and_len, seq_len, window_size = 30, in_channels=1, step=1, 
-                 num_classes=2, dist_measure='euclidean',
-                 nhead = 2, num_layers = 4,
+    def __init__(self, shapelets_size_and_len, in_channels=1, num_classes=2, dist_measure='euclidean',
                  to_cuda=True):
         super(LearningShapeletsModel, self).__init__()
 
         self.to_cuda = to_cuda
         self.shapelets_size_and_len = shapelets_size_and_len
         self.num_shapelets = sum(shapelets_size_and_len.values())
-        self.transform_seq_len = int((seq_len - window_size)/step+1)
         self.shapelets_blocks = ShapeletsDistBlocks(in_channels=in_channels,
-                                                    step=step, window_size=window_size,
                                                     shapelets_size_and_len=shapelets_size_and_len,
                                                     dist_measure=dist_measure, to_cuda=to_cuda)
-        self.positional_emb = nn.Embedding(self.transform_seq_len, self.num_shapelets)
-        encoder_layers = TransformerEncoderLayer(d_model=self.num_shapelets, nhead = nhead, batch_first=True)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, num_layers=num_layers)
         self.linear = nn.Linear(self.num_shapelets, num_classes)
-        
+
         if self.to_cuda:
             self.cuda()
 
@@ -593,16 +634,11 @@ class LearningShapeletsModel(nn.Module):
         @return: the logits for the class predictions of the model
         @rtype: tensor(float) of shape (num_samples, num_classes)
         """
-        # x = self.shapelets_blocks(x)
-        x, y = self.shapelets_blocks(x)
-        y = torch.squeeze(y, 1)
-        batch_size, seq_len, num_shapelets = y.shape
-        pos_indices = torch.arange(self.transform_seq_len, device=x.device).unsqueeze(0).expand(batch_size, seq_len)
-        pos_emb = self.positional_emb(pos_indices)
-        y = self.transformer_encoder(y+pos_emb)
+        x = self.shapelets_blocks(x)
         if optimize == 'acc':
-            y = self.linear(y[:, -1, :])
-        return y
+            x = self.linear(x)
+        x = torch.squeeze(x, 1)
+        return x
 
     def transform(self, X):
         """
@@ -612,8 +648,7 @@ class LearningShapeletsModel(nn.Module):
         @return: the shapelet transform of x
         @rtype: tensor(float) of shape (num_samples, num_shapelets)
         """
-        X_trans, _ = self.shapelets_blocks(X)
-        return X_trans
+        return self.shapelets_blocks(X)
 
     def get_shapelets(self):
         """
@@ -690,21 +725,17 @@ class LearningShapelets:
     to_cuda : bool
         if true loads everything to the GPU
     """
-    def __init__(self, shapelets_size_and_len, loss_func, 
-                 seq_len, window_size = 30,
-                 in_channels=1, step=1, num_classes=2,
-                 nhead = 2, num_layers = 2,
-                 dist_measure='euclidean', verbose=0, 
-                 to_cuda=True, k=0, l1=0.0, l2=0.0):
+    def __init__(self, shapelets_size_and_len, loss_func, in_channels=1, num_classes=2,
+                 dist_measure='euclidean', verbose=0, to_cuda=True, k=0, l1=0.0, l2=0.0):
 
-        self.model = LearningShapeletsModel(shapelets_size_and_len=shapelets_size_and_len,
-                                            seq_len=seq_len, window_size=window_size,
-                                            in_channels=in_channels, step=step,
-                                            num_classes=num_classes,
-                                            nhead=nhead, 
-                                            num_layers=num_layers,
-                                            dist_measure=dist_measure,
-                                            to_cuda=to_cuda)
+        self.model = LearningShapeletsModel(
+            shapelets_size_and_len=shapelets_size_and_len,
+            in_channels=in_channels, 
+            num_classes=num_classes, 
+            dist_measure=dist_measure,
+            to_cuda=to_cuda
+        )
+        
         self.to_cuda = to_cuda
         if self.to_cuda:
             self.model.cuda()
@@ -826,10 +857,9 @@ class LearningShapelets:
         return (loss_ce.item(), loss_dist.item(), loss_sim.item()) if self.l2 > 0.0 else (
         loss_ce.item(), loss_dist.item())
 
-    def fit(self, X, Y, X_val=None, Y_val=None, 
-            epochs=1, batch_size=256, shuffle=False, 
-            drop_last=False, model_path='./model/best_model.pth'
-        ):
+    def fit(self, X, Y, X_val=None, Y_val=None,  
+            epochs=1, batch_size=256, shuffle=False, drop_last=False, 
+            model_path = './model/model_test.pth'):
         """
         Train the model.
         @param X: the time series data set
@@ -858,9 +888,7 @@ class LearningShapelets:
         if self.to_cuda:
             X = X.cuda()
             Y = Y.cuda()
-
-        train_ds = TensorDataset(X, Y)
-        train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
+        
         val_dataset = None
         val_loader = None
         if X_val is not None and Y_val is not None:
@@ -873,23 +901,22 @@ class LearningShapelets:
                 Y_val = Y_val.cuda()
             val_dataset = TensorDataset(X_val, Y_val)
             val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
+            
+
+        train_ds = TensorDataset(X, Y)
+        train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
         # set model in train mode
         self.model.train()
 
-        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', 
-                                      factor=0.1, patience=10, verbose=True)
-        progress_bar = tqdm(range(epochs), disable=False if self.verbose > 0 else True)
-        
         losses_ce = []
         losses_dist = []
         losses_sim = []
         val_loss = []
         best_val_loss = float('inf')
-        
+        progress_bar = tqdm(range(epochs), disable=False if self.verbose > 0 else True)
         current_loss_ce = 0
         current_loss_dist = 0
         current_loss_sim = 0
-        
         for _ in progress_bar:
             for j, (x, y) in enumerate(train_dl):
                 # check if training should be done with regularizer
@@ -901,7 +928,7 @@ class LearningShapelets:
                         current_loss_ce, current_loss_dist, current_loss_sim = self.update_regularized(x, y)
                     else:
                         current_loss_ce, current_loss_dist = self.update_regularized(x, y)
-                    # losses_ce.append(current_loss_ce)
+                    losses_ce.append(current_loss_ce)
                     losses_dist.append(current_loss_dist)
                     if self.l2 > 0.0:
                         losses_sim.append(current_loss_sim)
@@ -913,8 +940,6 @@ class LearningShapelets:
                                                  f"Loss sim: {current_loss_sim}")
                 else:
                     progress_bar.set_description(f"Loss CE: {current_loss_ce}, Loss dist: {current_loss_dist}")
-            scheduler.step(current_loss_ce)
-            losses_ce.append(current_loss_ce)
             if val_loader is not None:
                 self.model.eval()
                 batch_loss = []
@@ -925,6 +950,7 @@ class LearningShapelets:
                         batch_loss.append(loss.item())
                 val_loss_epoch = sum(batch_loss) / len(batch_loss)
                 val_loss.append(val_loss_epoch)
+                
                 # Early stopping
                 if val_loss_epoch < best_val_loss:
                     best_val_loss = val_loss_epoch
@@ -932,6 +958,10 @@ class LearningShapelets:
                     torch.save(self.model.state_dict(), model_path)
                 else:
                     epochs_no_improve += 1
+                
+                # if epochs_no_improve >= patience:
+                #     print(f"Early stopping at epoch {epoch}")
+                #     break
                 
                 self.model.train()
         if not self.use_regularizer:

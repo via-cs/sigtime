@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath('../'))
 
-from src.learning_shapelets_sliding_window import ShapeletsDistBlocks
+from src.learning_shapelets_sliding_window_dtw import ShapeletsDistBlocks
 
 import torch
 from torch import nn

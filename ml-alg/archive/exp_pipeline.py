@@ -55,7 +55,7 @@ def torch_dist_ts_shapelet(ts, shapelet, cuda=True):
 
 
 def shapelet_initialization(
-    X_train, y_train, config, num_classes=2, dataset='preterm', mode='pips', version=''
+    X_train, y_train, config, num_classes=2, dataset='preterm', mode='pips', version='',
 ):
     _, n_channels, len_ts = X_train.shape
     if mode=='pips':

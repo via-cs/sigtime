@@ -434,16 +434,30 @@ class TsRenderer {
   }
 
   public render() {
+    const MAX_WIDTH_FOR_FEW_AXES = 100;
     if (!this.hasConfig) {
       console.error('Rendering config not set');
       return;
     }
 
     this.destroy();
-    this.dimensions = this.shapelets.map((s) => `shapelet-${s.id}`);
+    const threshold = 5;
+    const filteredShapelets = this.shapelets.filter(
+      (s) => !s?.sims?.some((value, index) => value < threshold && index < s.id)
+      // (s) => s.id <= 5
+    );
+    // this.dimensions = this.shapelets.map((s) => `shapelet-${s.id}`);
+    this.dimensions = filteredShapelets.map((s) => `shapelet-${s.id}`);
     this.overviewY = d3.scaleLinear()
         .domain([0 - this.BOUNDARY, 1 + this.BOUNDARY])
         .range([0, this.height - this.margin.top - this.margin.bottom]);
+    
+    // const spacing = 90; // how much space each axis should take
+    // const totalNeeded = spacing * (this.dimensions.length - 1);
+    // const layoutWidth = Math.min(totalNeeded, this.width - this.margin.left - this.margin.right);
+    // this.x = d3.scalePoint()
+    //   .domain(this.dimensions)
+    //   .range([0, layoutWidth]);
     this.x = d3.scalePoint()
         .domain(this.dimensions)
         .range([0, this.width - this.margin.left - this.margin.right]);

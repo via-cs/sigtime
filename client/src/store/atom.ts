@@ -15,7 +15,7 @@ import * as d3 from 'd3';
 import config from '@/config';
 // Current selected dataset
 export const datasetAtom = atom<Dataset>('ECG200_Norm');
-
+export const filterAtom = atom<boolean>(false);
 export const paramsAtom = atom<IParams>({
   numClusters: 8,
   numShaplets: 10,

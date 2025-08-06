@@ -47,6 +47,8 @@ export interface IShapeData {
   len: number;
   // information gain
   gain: number;
+  rank: number, 
+  sims: number[];
 }
 
 export interface IShapeResponse {

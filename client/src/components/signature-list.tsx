@@ -2,9 +2,9 @@
  * signature-list.tsx
  *
  * @project: ts-signature
- * @author: Juntong Chen (dev@jtchen.io)
+ * @author: Juntong Chen (dev@jtchen.io) / Yu-Chia Huang (ycihuang@ucdavis.edu)
  * @created: 2025-02-05 00:49:56
- * @modified: 2025-03-19 16:19:21
+ * @modified: 2025-08-05
  *
  * Copyright (c) 2025 Juntong Chen. All rights reserved.
  */
@@ -35,7 +35,7 @@ export function SignatureList(props: ISignatureListProps) {
       return b.count - a.count;
     });
   }, [spData, selection.sortBy]);
-
+  const threshold = 5; // Exclude shapelets with similarity below this threshold
 
   return (
     <>
@@ -69,21 +69,26 @@ export function SignatureList(props: ISignatureListProps) {
 
       <div className={'flex flex-row w-full gap-2 h-24 no-shrink rounded-sm overflow-x-auto relative p-0 invisible-scrollbar'}>
         {spLoading && <LoadingIndicator fullScreen={true} />}
-        {!spLoading && spData && spData.map((shapelet) => (
-          <VisSigItem
-            onClick={() => {
-              setSelection(produce((draft) => {
-                if (draft.shapelets) {
-                  draft.shapelets = draft.shapelets.includes(shapelet.id) ?
-                    draft.shapelets.filter((id) => id !== shapelet.id) :
-                    [...draft.shapelets, shapelet.id];
-                } else {
-                  draft.shapelets = [shapelet.id];
-                }
-              }));
-            }}
-            shapelet={shapelet} key={`${dataset}-shapelet-${shapelet.id}`} />
-        ))}
+        {!spLoading && spData && spData
+        .filter((shapelet) => !shapelet.sims?.some((value, index) => value < threshold && index < shapelet.id)) 
+        .map((shapelet) => 
+        {
+          return (
+            <VisSigItem
+              onClick={() => {
+                setSelection(produce((draft) => {
+                  if (draft.shapelets) {
+                    draft.shapelets = draft.shapelets.includes(shapelet.id) ?
+                      draft.shapelets.filter((id) => id !== shapelet.id) :
+                      [...draft.shapelets, shapelet.id];
+                  } else {
+                    draft.shapelets = [shapelet.id];
+                  }
+                }));
+              }}
+              shapelet={shapelet} key={`${dataset}-shapelet-${shapelet.id}`} />
+          )
+        })}
       </div>
     </>
   );

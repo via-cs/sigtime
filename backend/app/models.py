@@ -27,6 +27,8 @@ class ShapeData(BaseModel):
     vals: List[float]
     len: int
     gain: float
+    rank: int
+    sims: List[float]
 
 class MatchUnit(BaseModel):
     s: int

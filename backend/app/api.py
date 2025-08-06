@@ -92,11 +92,20 @@ async def get_shape_info(
         shape_info = json.load(f)
     shape_list = []
     for i, shape in enumerate(shape_info):
+        if i == 0:
+            sims = [100, 10, 10, 0, 10, 10, 10, 10, 10, 10]
+        elif i == 3:
+            sims = [0, 10, 10, 100, 10, 10, 10, 10, 10, 10]
+        else:
+            sims = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+            
         obj = {
             'id': i,
             'len': shape['len'],
             'gain': shape['gain'],
             'vals': shape['wave'][0],
+            'rank': i, 
+            'sims': sims,
         }
         shape_list.append(obj)
 

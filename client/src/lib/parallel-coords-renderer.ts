@@ -94,6 +94,7 @@ class ParallelCoordsRenderer {
     this.margin = config.margin || this.margin;
     this.hasConfig = true;
     this.allInstances = config.allInstances;
+    
     this.shapelets = config.shapelets;
 
     this.canvasWidth = this.width - this.margin.left - this.margin.right;

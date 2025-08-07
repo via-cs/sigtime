@@ -10,10 +10,8 @@ print(f"Base directory: {BASE_DIR}")
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 print(f"Data directory: {DATA_DIR}")
 
-if __name__ == "__main__":
+def rank_shapelets(dataset, version=''):
     # Example usage
-    dataset = 'ECG5000'
-    version = '_shap'
     shapelet_path = os.path.join(DATA_DIR, f'{dataset}{version}/output_shapelet_with_dtw.json')
     
     with open(shapelet_path, 'r') as f:

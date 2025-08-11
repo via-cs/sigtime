@@ -14,8 +14,7 @@ import {atom} from 'jotai';
 import * as d3 from 'd3';
 import config from '@/config';
 // Current selected dataset
-export const datasetAtom = atom<Dataset>('ECG200_Norm');
-export const filterAtom = atom<boolean>(false);
+export const datasetAtom = atom<Dataset>('preterm_0808');
 export const paramsAtom = atom<IParams>({
   numClusters: 8,
   numShaplets: 10,
@@ -24,6 +23,8 @@ export const paramsAtom = atom<IParams>({
   lineOpacity: 0.2,
   horizontalZoom: 1,
   showConnections: false,
+  filterSimilar: false,
+  similarThreshold: 3,
   curveType: config.defaultCurveType,
 });
 

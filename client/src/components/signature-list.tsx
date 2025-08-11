@@ -31,11 +31,10 @@ export function SignatureList(props: ISignatureListProps) {
   const sortedShapelets = React.useMemo(() => {
     if (!spData) return [];
     return spData.sort((a, b) => {
-      if (selection.sortBy === 'id') return a.id - b.id;
+      if (selection.sortBy === 'id') return a.rank - b.rank;
       return b.count - a.count;
     });
   }, [spData, selection.sortBy]);
-  const threshold = 5; // Exclude shapelets with similarity below this threshold
 
   return (
     <>
@@ -70,7 +69,6 @@ export function SignatureList(props: ISignatureListProps) {
       <div className={'flex flex-row w-full gap-2 h-24 no-shrink rounded-sm overflow-x-auto relative p-0 invisible-scrollbar'}>
         {spLoading && <LoadingIndicator fullScreen={true} />}
         {!spLoading && spData && spData
-        .filter((shapelet) => !shapelet.sims?.some((value, index) => value < threshold && index < shapelet.id)) 
         .map((shapelet) => 
         {
           return (

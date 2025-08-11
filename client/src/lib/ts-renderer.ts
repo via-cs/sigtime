@@ -43,6 +43,7 @@ class TsRenderer {
   overviewY: d3.ScaleLinear<number, number, never>;
   dimensions: string[];
 
+
   SHAPELET_WIDTH = 70;
   SHAPELET_HEIGHT = 30;
   LABEL_HEIGHT = 15;
@@ -271,20 +272,26 @@ class TsRenderer {
     });
 
     for (let di = 0; di < this.dimensions.length; di++) {
+      const KDE_WIDTH = 70; // or 50 — whatever width you want the density shape to take
       const xScale = d3.scaleLinear()
-          .domain([0, 1])
-          .range([0, (this.width - this.margin.left - this.margin.right) / this.dimensions.length / 2 * 1.1]);
+        .domain([0, 1])
+        .range([0, KDE_WIDTH / 2]); // symmetrical around the axis line
+      // const xScale = d3.scaleLinear()
+      //     .domain([0, 1])
+      //     .range([0, (this.width - this.margin.left - this.margin.right) / this.dimensions.length / 2 * 1.1]);
 
       if (withKDE) {
         const areaNeg = d3.area<[number, number]>()
             .y((d) => this.overviewY(d[0]))
-            .x1((d) => this.x(this.dimensions[di]) + xScale(d[1]))
-            .x0((d) => this.x(this.dimensions[di]) - xScale(d[1]));
-
+            .x1((d) => + xScale(d[1]))
+            .x0((d) =>  - xScale(d[1]));
+            // .x1((d) => this.x(this.dimensions[di]) + xScale(d[1]))
+            // .x0((d) => this.x(this.dimensions[di]) - xScale(d[1]));
+          
         const areaPos = d3.area<[number, number]>()
             .y((d) => this.overviewY(d[0]))
-            .x1((d) => this.x(this.dimensions[di]) + xScale(d[1]))
-            .x0((d) => this.x(this.dimensions[di]) - xScale(d[1]));
+            .x1((d) => + xScale(d[1]))
+            .x0((d) =>  - xScale(d[1]));
 
         this.mainG.append('path')
             .attr('id', `density-neg-${di}`)
@@ -294,6 +301,7 @@ class TsRenderer {
             .attr('fill-opacity', 0.2)
             .attr('stroke', colors.neg)
             .attr('stroke-opacity', 0.3)
+            .attr('transform', `translate(${this.x(this.dimensions[di])}, 0)`)
         // @ts-ignore
             .attr('d', areaNeg);
 
@@ -305,6 +313,7 @@ class TsRenderer {
             .attr('fill-opacity', 0.2)
             .attr('stroke', colors.pos)
             .attr('stroke-opacity', 0.3)
+            .attr('transform', `translate(${this.x(this.dimensions[di])}, 0)`)
         // @ts-ignore
             .attr('d', areaPos);
       }
@@ -441,12 +450,9 @@ class TsRenderer {
     }
 
     this.destroy();
-    const threshold = 5;
     const filteredShapelets = this.shapelets.filter(
-      (s) => !s?.sims?.some((value, index) => value < threshold && index < s.id)
-      // (s) => s.id <= 5
+      (s) => !s?.sims?.some((value, index) => value < this.params.similarThreshold && index < s.id && this.params.filterSimilar),
     );
-    // this.dimensions = this.shapelets.map((s) => `shapelet-${s.id}`);
     this.dimensions = filteredShapelets.map((s) => `shapelet-${s.id}`);
     this.overviewY = d3.scaleLinear()
         .domain([0 - this.BOUNDARY, 1 + this.BOUNDARY])

@@ -38,7 +38,6 @@ export default function VisSigItem(props: IVisSigItemProps) {
     const height = svg.node().clientHeight;
     const width = svg.node().clientWidth;
     const margin = {top: 10, right: 10, bottom: 10, left: 10};
-
     const scaleX = d3.scaleLinear()
         .domain([0, len])
         .range([margin.left, width - margin.right]);
@@ -51,12 +50,34 @@ export default function VisSigItem(props: IVisSigItemProps) {
         .y((d, i) => scaleY(d))
         .curve(d3.curveMonotoneX);
 
+    
+
     svg.append('path')
         .datum(data)
         .attr('d', line)
         .attr('stroke', colors.shapes[props.shapelet.id % colors.shapes.length])
         .attr('fill', 'none')
         .attr('stroke-width', 3);
+    svg.append('g')
+      .append('rect')
+      .attr('x', width / 2 - 18)
+      .attr('y', margin.top - 8)
+      .attr('width', 36)
+      .attr('height', 18)
+      .attr('rx', 4)
+      .attr('fill', '#fff')
+      .attr('stroke', '#bbb')
+      .attr('stroke-width', 1);
+
+    svg.append('g')
+      .append('text')
+      .attr('x', width / 2)
+      .attr('y', margin.top + 5)
+      .attr('text-anchor', 'middle')
+      .attr('alignment-baseline', 'middle')
+      .attr('font-size', 12)
+      .attr('fill', '#333')
+      .text(len);
   }, [svgRef]);
 
   return (

@@ -194,6 +194,18 @@ export default function PanelTs(props: IPanelTsProps) {
               }
               label="Show Connections"
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  sx={{py: 0, pr: 0.5}}
+                  checked={params.filterSimilar}
+                  onChange={(e) => setParams({...params, filterSimilar: e.target.checked})}
+                  name="filterOut"
+                  color="primary"
+                />
+              }
+              label="Filter Out Similar"
+            />
           </>
         )}
         <TextField

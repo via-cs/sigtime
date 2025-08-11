@@ -12,24 +12,24 @@
 import {IDatasetConfig} from '@/types';
 
 export const datasetConfig: IDatasetConfig[] = [
+  // {
+  //   name: 'Robot',
+  //   displayName: 'Robot',
+  //   posValue: '1',
+  //   negValue: '0',
+  //   posLabel: 'Hard',
+  //   negLabel: 'Smooth',
+  // },
+  // {
+  //   name: 'robot_1',
+  //   displayName: 'Robot FCN',
+  //   posValue: '1',
+  //   negValue: '0',
+  //   posLabel: 'Hard',
+  //   negLabel: 'Smooth',
+  // },
   {
-    name: 'Robot',
-    displayName: 'Robot',
-    posValue: '1',
-    negValue: '0',
-    posLabel: 'Hard',
-    negLabel: 'Smooth',
-  },
-  {
-    name: 'robot_1',
-    displayName: 'Robot FCN',
-    posValue: '1',
-    negValue: '0',
-    posLabel: 'Hard',
-    negLabel: 'Smooth',
-  },
-  {
-    name: 'preterm',
+    name: 'preterm_0808',
     displayName: 'Preterm dataset',
     posValue: '1',
     negValue: '0',
@@ -37,7 +37,7 @@ export const datasetConfig: IDatasetConfig[] = [
     negLabel: 'No Preterm  ',
   },
   {
-    name: 'ECG5000_New',
+    name: 'ECG5000_0808',
     displayName: 'ECG 5000',
     posValue: '1',
     negValue: '0',
@@ -52,13 +52,13 @@ export const datasetConfig: IDatasetConfig[] = [
     posLabel: 'Normal',
     negLabel: 'Ischemia',
   },
-  {
-    name: 'Strawberry',
-    displayName: 'Strawberry',
-    posValue: '1',
-    negValue: '0',
-    posLabel: 'Normal',
-    negLabel: 'Abnormal',
-  }
+  // {
+  //   name: 'Strawberry',
+  //   displayName: 'Strawberry',
+  //   posValue: '1',
+  //   negValue: '0',
+  //   posLabel: 'Normal',
+  //   negLabel: 'Abnormal',
+  // }
 
 ];

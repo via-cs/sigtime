@@ -20,7 +20,7 @@ export interface IDatasetConfig {
   negLabel: string;
 }
 
-export type Dataset = 'GunPoint' | 'ECG200' | 'Coffee' | 'BirdChicken' | 'Night' | 'Robot' | 'preterm' | 'ECG5000' | 'ECG200_Norm' | 'ECG200_JOINT_20' | 'ECG5000_New' | 'Strawberry' | 'ECG5000_demo' | 'robot_1';
+export type Dataset = 'GunPoint' | 'ECG200' | 'Coffee' | 'BirdChicken' | 'Night' | 'Robot' | 'preterm_0808' | 'ECG5000' | 'ECG200_Norm' | 'ECG200_JOINT_20' | 'ECG5000_0808' | 'Strawberry' | 'ECG5000_demo' | 'robot_1';
 export type CurveType = 'step' | 'linear' | 'curve';
 
 export type AtomSetter<T> = (value: T | ((prev: T) => T)) => void;
@@ -46,6 +46,8 @@ export interface IParams {
   horizontalZoom: number;
   curveType: CurveType;
   showConnections: boolean;
+  filterSimilar: boolean;
+  similarThreshold: number;
 }
 
 export interface ISelection {

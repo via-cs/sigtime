@@ -88,24 +88,18 @@ async def get_shape_info(
     Return: a list of shapelet info, each of its contains
     This is a test endpoint to get shape data.
     """
-    with open(get_data_file(f'./{dataset}/output_shapelet.json')) as f:
+    with open(get_data_file(f'./{dataset}/output_shapelet_with_dtw_sorted.json')) as f:
         shape_info = json.load(f)
     shape_list = []
     for i, shape in enumerate(shape_info):
-        if i == 0:
-            sims = [100, 10, 10, 0, 10, 10, 10, 10, 10, 10]
-        elif i == 3:
-            sims = [0, 10, 10, 100, 10, 10, 10, 10, 10, 10]
-        else:
-            sims = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
             
         obj = {
             'id': i,
             'len': shape['len'],
             'gain': shape['gain'],
             'vals': shape['wave'][0],
-            'rank': i, 
-            'sims': sims,
+            'rank': shape['rank'], 
+            'sims': shape['sims'],
         }
         shape_list.append(obj)
 

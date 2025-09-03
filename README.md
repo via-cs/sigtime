@@ -14,12 +14,13 @@ Install the essential packages with
 pip install -r requirements.txt
 ```
 ### Quick start
-Training sigtime model with respective parameters, for example, 
+Training sigtime model with respective parameters, for example,
 ```
 python main.py --epochs 100 --datatype public --dataset ECG200
 ```
 The system supports public datasets from https://timeseriesclassification.com.
-For preterm birth testing, please have training command like 
+
+For preterm birth dataset, the command should be:
 ```
 python main.py --epochs 100 --datatype private --dataset preterm
 ```

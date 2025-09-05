@@ -167,7 +167,10 @@ def get_weights_via_kmeans(X, shapelets_size, num_shapelets, n_segments=1000):
     clusters = k_means.cluster_centers_.transpose(0, 2, 1)
     return clusters
 
-def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
+def store_data(data, dataset, model, list_shapelets_meta, list_shapelets, output_version=''):
+    
+    output_dir = f"./data/{dataset}_{output_version}"
+    os.makedirs(output_dir, exist_ok=True)
     X_train = data['X_train']
     X_val = data['X_val']
     X_test = data['X_test']
@@ -228,9 +231,9 @@ def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
     # Sort output_shapelet based on 'gain'
     output_shapelet = sorted(output_shapelet, key=lambda x: x['gain'], reverse=True)
     output_shapelet = output_shapelet[:10]  # Keep only the top 10 shapelets based on gain
-    output_dir = f"./data/{dataset}"
     
-    os.makedirs(output_dir, exist_ok=True)
+    
+    
     min_distance_df = pd.DataFrame(min_distance[:, :10])
     min_distance_df.to_csv(os.path.join(output_dir, "shapelet_transform.csv"), index=False)
     X_all_df = pd.DataFrame(X_all.reshape(X_all.shape[0], -1))
@@ -368,6 +371,7 @@ def train(
     #     to_cuda = True
     # )
     _, n_channels, len_ts = X_train.shape
+    print("batch size:", config['batch_size'])
     loss_func = nn.CrossEntropyLoss()
     model = LearningShapeletsFCN(
         shapelets_size_and_len=shapelets_size_and_len,
@@ -390,6 +394,7 @@ def train(
             shuffle=True, 
             model_path= model_path
     )
+    
     torch.save(
         model.model.state_dict(), 
         os.path.join(DATA_DIR, f'model_dtw_{dataset}.pth')
@@ -399,6 +404,10 @@ def train(
     results = eval_results(y_test, y_hat)
     elapsed_time = time.time() - t1
     store_data(data, dataset, model, list_shapelets_meta, list_shapelets)
+    
+    store_data(data, dataset, model, list_shapelets_meta, list_shapelets, output_version='dtw')
+    
+    
     return elapsed_time, results, loss[-1]
 
 

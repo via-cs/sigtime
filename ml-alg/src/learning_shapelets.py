@@ -55,6 +55,9 @@ class MinEuclideanDistBlock(nn.Module):
         x = torch.sum(x, dim=1, keepdim=True).transpose(2, 3)
         # hard min compared to soft-min from the paper
         x, _ = torch.min(x, 3)
+        x_min = x.min(dim=2, keepdim=True)[0]
+        x_max = x.max(dim=2, keepdim=True)[0]
+        x = (x - x_min) / (x_max - x_min + 1e-8)  # prevent division by 0
         return x
 
     def get_shapelets(self):

@@ -30,7 +30,11 @@ from src.fe_shape_joint import JointTraining
 from src.fe_shape_joint import feature_extraction_selection, extraction_pipeline
 from utils.evaluation_and_save import eval_results 
 
+import matplotlib.pyplot as plt
+
 torch.cuda.set_device(0)
+
+
 
 def torch_dist_ts_shapelet(ts, shapelet, cuda=True):
     """
@@ -78,6 +82,9 @@ def shapelet_initialization(
         
         t1 = time.time()
         csv_path = os.path.join(root, f'list_shapelets_meta_{dataset}_{ws_rate}_{num_pip}_{num_shapelets_make}.csv')
+        print(csv_path)
+        if version != '':
+            csv_path = os.path.join(root, f'list_shapelets_meta_{dataset}_{ws_rate}_{num_pip}_{num_shapelets_make}_v{version}.csv')
         if os.path.exists(csv_path):
             
             df_shapelets_meta = pd.read_csv(csv_path)
@@ -108,8 +115,7 @@ def shapelet_initialization(
             df_shapelets_meta = df_shapelets_meta.sort_values(by='inforgain', ascending=False)
             print(df_shapelets_meta)  # Display first 5 shapelets for brevity
             # Filter out long shapelets
-            max_shapelet_length = int(len_ts * 0.5)  # filter out shapelets longer than 50% of the time series length
-            
+            max_shapelet_length = int(len_ts * 0.25)  # filter out shapelets longer than 50% of the time series length
             df_shapelets_meta = df_shapelets_meta[
                 df_shapelets_meta['end_pos'] - df_shapelets_meta['start_pos'] <= max_shapelet_length
             ]
@@ -299,9 +305,18 @@ def train(
     y_hat = model.predict(X_test, FE = X_test_split_filtered)
     results = eval_results(y_test, y_hat)
     elapsed_time = time.time() - t1
+    
+    fig = plt.figure()
+    plt.plot(loss[0])
+    plt.xlabel('Epoch')
+    plt.ylabel('Validation Loss')
+    fig.savefig(f'./training_plot/{dataset}_{init_mode}_{version}_val_loss.png')
     return elapsed_time, results, loss[-1]
 
-def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
+def store_data(data, dataset, model, list_shapelets_meta, list_shapelets, output_version=''):
+    
+    output_dir = f"./data/{dataset}_{output_version}"
+    os.makedirs(output_dir, exist_ok=True)
     X_train = data['X_train']
     X_val = data['X_val']
     X_test = data['X_test']
@@ -362,9 +377,9 @@ def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
     # Sort output_shapelet based on 'gain'
     output_shapelet = sorted(output_shapelet, key=lambda x: x['gain'], reverse=True)
     output_shapelet = output_shapelet[:10]  # Keep only the top 10 shapelets based on gain
-    output_dir = f"./data/{dataset}"
     
-    os.makedirs(output_dir, exist_ok=True)
+    
+    
     min_distance_df = pd.DataFrame(min_distance[:, :10])
     min_distance_df.to_csv(os.path.join(output_dir, "shapelet_transform.csv"), index=False)
     X_all_df = pd.DataFrame(X_all.reshape(X_all.shape[0], -1))
@@ -386,10 +401,10 @@ def store_data(data, dataset, model, list_shapelets_meta, list_shapelets):
 
     with open(os.path.join(output_dir, "output_shapelet.json"), 'w') as f:
         json.dump(output_shapelet_json, f)
+    
+    print(f"Data stored in {output_dir}")
         
 def pipeline(config, dataset='ECG200', datatype='public', version=''):
-    dataset = 'ECG200'
-    datatype = 'public'
     store_results = False
     
     data_path = os.path.join('./data', f'{dataset}.npz')

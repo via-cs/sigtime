@@ -59,9 +59,6 @@ class MinEuclideanDistBlock(nn.Module):
         
         x = torch.cdist(x, self.shapelets, p=2)
         y_ = torch.cdist(y_, self.shapelets, p=2)
-        # x_min = x.min(dim=-1, keepdim=True)[0]
-        # x_max = x.max(dim=-1, keepdim=True)[0]
-        # y_ = (x - x_min) / (x_max - x_min + 1e-8)
         y_ = torch.sum(y_, dim=1, keepdim=True) # [batch_size, 1, num_shapelets, seq_len]
         
         y_, _ = torch.min(y_, 3)
@@ -72,8 +69,18 @@ class MinEuclideanDistBlock(nn.Module):
         x = torch.sum(x, dim=1, keepdim=True).transpose(2, 3)
         # hard min compared to soft-min from the paper
         x, _ = torch.min(x, 3)
+        
+        # x normalization over batch and shapelet dim
+        x_min = x.amin(dim=(0, 2), keepdim=True)
+        x_max = x.amax(dim=(0, 2), keepdim=True)
+        x_norm = (x - x_min) / (x_max - x_min + 1e-8)
+
+        # y_ normalization over batch, window, and shapelet dim
+        y_min = y_.amin(dim=(0, 2, 3), keepdim=True)
+        y_max = y_.amax(dim=(0, 2, 3), keepdim=True)
+        y_norm = (y_ - y_min) / (y_max - y_min + 1e-8)
         # x, _ = nn.Softmin(x, 3)
-        return x, y_
+        return x_norm, y_norm
 
     def get_shapelets(self):
         """

@@ -3,6 +3,7 @@ import sys
 import argparse
 
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 from torch import optim
@@ -59,6 +60,8 @@ parser.add_argument('--nhead', type=int, default=2, help='Number of attention he
 parser.add_argument('--d_model', type=int, default=4, help='Dimension of the model for the transformer')
 parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the transformer model')
 
+
+
 def train(
     data,
     shapelets_size_and_len,
@@ -77,8 +80,10 @@ def train(
         
     window_size = max(shapelets_size_and_len.keys())
     window_step = config['step']
-    
+    print(window_size)
+    print(X_train.shape)
     # Load or compute sliding window features
+    print(os.path.join(DATA_DIR, f'{dataset}_X_test_split_filtered_{window_size}_{window_step}_{version}.npy'))
     if os.path.exists(os.path.join(DATA_DIR, f'{dataset}_X_test_split_filtered_{window_size}_{window_step}_{version}.npy')):
         X_train_split_filtered = np.load(os.path.join(DATA_DIR, f'{dataset}_X_train_split_filtered_{window_size}_{window_step}_{version}.npy'))
         X_val_split_filtered = np.load(os.path.join(DATA_DIR, f'{dataset}_X_val_split_filtered_{window_size}_{window_step}_{version}.npy'))
@@ -195,6 +200,7 @@ def train(
         model=model,
         list_shapelets_meta=list_shapelets_meta, 
         list_shapelets=list_shapelets, 
+        output_version="shap"
     )
     torch.save(
         model.model.state_dict(), 
@@ -344,7 +350,6 @@ def shap_eval(
     seq_len = X_train_split_filtered.shape[-2]            # as used in your model
     num_shapelets = sum(shapelets_size_and_len.values())
     num_features = X_train_split_filtered.shape[-1]
-    print(X_train_split_filtered.shape)
     
     y_bg = torch.zeros((N_bg, seq_len, num_shapelets), dtype=torch.float32)
     stat_bg = torch.zeros((N_bg, seq_len, num_features), dtype=torch.float32)  
@@ -389,15 +394,16 @@ def shap_eval(
     
     print(np.shape(shap_values[0]))  
     print(np.shape(shap_values[1])) 
-    y_size = seq_len * num_shapelets
-    shap_shapelet = shap_values[:, :y_size].reshape(N_test, seq_len, num_shapelets)
-    shap_stat = shap_values[:, y_size:].reshape(N_test, seq_len, num_features)
-
+    print(len(shap_values))
+    
+    np.save(os.path.join(DATA_DIR, f'shap_values_0_{dataset}.npy'), shap_values[0])
+    np.save(os.path.join(DATA_DIR, f'shap_values_1_{dataset}.npy'), shap_values[1])
     
 
 def pipeline(config, dataset='ECG200', datatype='public', version='', training = True):
     
     data_path = os.path.join(DATA_DIR, f'{dataset}.npz')
+    print(data_path)
     meta_path = os.path.join(DATA_DIR, 'filtered_clinical_data.csv')
     strip_path='./data/filtered_strips_data.json'
     if len(version) > 0 and datatype == 'private':
@@ -416,7 +422,7 @@ def pipeline(config, dataset='ECG200', datatype='public', version='', training =
     else:
         data = public_pipeline(
             dataset=dataset, 
-            output=store_results, 
+            output=False, 
             root=DATA_DIR,
             config=config['data_loading'], 
         )
@@ -442,7 +448,8 @@ def pipeline(config, dataset='ECG200', datatype='public', version='', training =
             list_shapelets=list_shapelets,
             list_shapelets_meta=list_shapelets_meta,
             config=config['model_config'],
-            version=version
+            version=version, 
+            dataset=dataset
         )
         print(final_results)
     else:
@@ -452,7 +459,8 @@ def pipeline(config, dataset='ECG200', datatype='public', version='', training =
             list_shapelets=list_shapelets,
             list_shapelets_meta=list_shapelets_meta,
             config=config['model_config'],
-            version=version
+            version=version,
+            dataset=dataset
         )
 
 if __name__ == "__main__":
@@ -502,7 +510,7 @@ if __name__ == "__main__":
     }
 
     data_path = os.path.join(DATA_DIR, f'{dataset}.npz')
-    
+    print(args.dataset)
     if datatype == 'private':
         data = preterm_pipeline(
             config=config['data_loading'], 
@@ -527,6 +535,7 @@ if __name__ == "__main__":
     pipeline(
         config, datatype=args.datatype, 
         dataset=args.dataset, version='',
+        training=False
     )
     
     # print(results)

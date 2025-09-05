@@ -41,7 +41,7 @@ class MinEuclideanDistBlock(nn.Module):
     cuda : bool
         if true loads everything to the GPU
     """
-    def __init__(self, shapelets_size, num_shapelets, in_channels=1, to_cuda=True, gamma=1.0):
+    def __init__(self, shapelets_size, num_shapelets, in_channels=1, to_cuda=True, gamma=1.0, stride=20):
         super(MinEuclideanDistBlock, self).__init__()
         self.to_cuda = to_cuda
         self.num_shapelets = num_shapelets
@@ -56,7 +56,7 @@ class MinEuclideanDistBlock(nn.Module):
         # otherwise gradients will not be backpropagated
         self.shapelets.retain_grad()
         self.sdtw = pysdtw.SoftDTW(gamma=gamma, dist_func=pysdtw.distance.pairwise_l2_squared, use_cuda=to_cuda)
-
+        self.stride = stride
 
     def forward(self, x):
         """
@@ -76,7 +76,7 @@ class MinEuclideanDistBlock(nn.Module):
             # Multivariate: handle accordingly (sum DTW across channels, etc.)
             raise NotImplementedError("Multivariate DTW not implemented in this example")
 
-        windows = x.unfold(2, self.shapelets_size, 1).squeeze(1)  # [batch, num_windows, shapelets_size]
+        windows = x.unfold(2, self.shapelets_size, self.stride).squeeze(1)  # [batch, num_windows, shapelets_size]
         num_windows = windows.shape[1]
         windows_reshaped = windows.reshape(-1, self.shapelets_size)  # [N, shapelets_size]
         N = windows_reshaped.shape[0]

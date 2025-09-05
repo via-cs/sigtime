@@ -1,11 +1,15 @@
 import os
-from pipeline_preterm import pipeline
-from utils.evaluation_and_save import save_results_to_csv
+import sys
+print(f"Current working directory: {os.getcwd()}")
+from shap_exp.joint_pipeline import pipeline
+from shap_exp.test_FCN import pipeline as shap_fcn_pipeline
+from utils.dtw_implentation import compute_and_save_shape_dtw
+from utils.rank_shapelets import rank_shapelets
 import argparse
 parser = argparse.ArgumentParser()
 # ------------------------------ Input and Output -------------------------------------
-parser.add_argument('--datatype', type=str, default='private', choices={'public', 'private'})
-parser.add_argument('--dataset', type=str, default='preterm')
+parser.add_argument('--datatype', type=str, default='public', choices={'public', 'private'})
+parser.add_argument('--dataset', type=str, default='ECG5000')
 parser.add_argument('--version', type=str, default='3')
 parser.add_argument('--test_ratio', type=float, default=0.2, help='Test ratio for data splitting')
 parser.add_argument('--val_ratio', type=float, default=0.2, help='Validation ratio for data splitting')
@@ -17,11 +21,11 @@ parser.add_argument('--step_min', type=int, default=1, help='Minimum step size')
 parser.add_argument('--init_mode', type=str, default='pips', choices={'pips', 'random'}, help='Initialization mode')
 parser.add_argument('--model_mode', type=str, default='JOINT', choices={'JOINT', 'LS_FCN', 'LS_Transformer', 'BOSS'}, help='Model mode')
 parser.add_argument('--ws_rate', type=float, default=0.1, help='Window size rate for initialization')
-parser.add_argument('--num_pip', type=float, default=0.1, help='Number of PIPs for initialization')
+parser.add_argument('--num_pip', type=float, default=0.4, help='Number of PIPs for initialization')
 parser.add_argument('--num_shapelets_make', type=int, default=100, help='Number of shapelets to make during initialization')
-parser.add_argument('--num_shapelets', type=int, default=10, help='Number of shapelets to use in the model')
-parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
-parser.add_argument('--batch_size', type=int, default=16, help='Batch size for training')
+parser.add_argument('--num_shapelets', type=int, default=50, help='Number of shapelets to use in the model')
+parser.add_argument('--epochs', type=int, default=1000, help='Number of training epochs')
+parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training')
 parser.add_argument('--model_path', type=str, default='./model/best_model.pth', help='Path to save the best model')
 parser.add_argument('--step', type=int, default=1, help='Step size for training')
 parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate for the optimizer')
@@ -32,8 +36,9 @@ parser.add_argument('--l1', type=float, default=1e-5, help='L1 regularization co
 parser.add_argument('--l2', type=float, default=0, help='L2 regularization coefficient')
 parser.add_argument("--config", type=str, default=None, help="Path to a YAML configuration file")
 parser.add_argument('--nhead', type=int, default=2, help='Number of attention heads for the model')
-parser.add_argument('--d_model', type=int, default=8, help='Dimension of the model for the transformer')
-parser.add_argument('--num_layers', type=int, default=2, help='Number of layers in the transformer model')
+parser.add_argument('--d_model', type=int, default=4, help='Dimension of the model for the transformer')
+parser.add_argument('--num_layers', type=int, default=4, help='Number of layers in the transformer model')
+parser.add_argument('--shap_version', type=str, default='', help='Window size for sliding window features (0 for auto)')
 # --------------------------------------------------------------------------------------
 # configuration loading
 args = parser.parse_args()
@@ -77,60 +82,33 @@ config = { # default
 }
 
 
+# -------------------------------- Run Pipeline ---------------------------------------
+# pipeline(
+#     config, datatype=args.datatype, 
+#     dataset=args.dataset, version=args.version,
+#     training=True
+# )
 
-report = []
+# -------------------------------- Shap training and evaluation ---------------------------------------
 
-acc_list = []
-f1_list = []
-recall_list = []
-precision_list = []
-val_loss_list = []
-elapsed_list = []
-for j in range(1):
-    elapsed, results, val_loss, shapetime = pipeline(
-        config, datatype=args.datatype, 
-        dataset=args.dataset, version=args.version,
-    )
-    acc_list.append(results['accuracy'])
-    precision_list.append(results['precision'])
-    f1_list.append(results['f1_score'])
-    recall_list.append(results['recall'])
-    val_loss_list.append(val_loss)
-    elapsed_list.append(elapsed)
+shap_fcn_pipeline(
+    config, datatype=args.datatype, 
+    dataset=args.dataset, version=args.version,
+    shap_version=args.shap_version,
+    pretrained_shapelets=True,
+    training=True
+)
 
-avg_acc = sum(acc_list) / len(acc_list)
-avg_prec = sum(precision_list) / len(precision_list)
-avg_f1 = sum(f1_list) / len(f1_list)
-avg_recall = sum(recall_list) / len(recall_list)
-avg_loss = sum(val_loss_list) / len(val_loss_list)
-avg_elapsed = sum(elapsed_list) / len(elapsed_list)
+shap_fcn_pipeline(
+    config, datatype=args.datatype, 
+    dataset=args.dataset, version=args.version,
+    pretrained_shapelets=True,
+    shap_version=args.shap_version,
+    training=False
+)
 
-print(f"Average accuracy: {avg_acc}")
-print(f"Average precision: {avg_prec}")
-print(f"Average f1-score: {avg_f1}")
-print(f"Average recall score: {avg_recall}")
-print(f"Average validation loss: {avg_loss}")
+# -------------------------------- compute dtw ---------------------------------------
+compute_and_save_shape_dtw(args.dataset, version=args.shap_version)
 
-result = {
-    'avg_accuracy': avg_acc,
-    'avg_f1': avg_f1,
-    'avg_recall': avg_recall,
-    'avg_precision': avg_prec,
-    'avg_val_loss': avg_loss,
-    'elapsed_time': avg_elapsed
-}
-# result['init_mode'] = config['init_mode']
-result['model_mode'] = config['model_mode']
-for key, value in config['data_loading'].items():
-    result[f'data_{key}'] = value
-for key, value in config['init_config'].items():
-    result[f'init_{key}'] = value
-for key, value in config['model_config'].items():
-    result[f'model_{key}'] = value
-
-print(result)
-report.append(result)
-print("-----------------")
-output_dir = f"./log/{args.dataset}/"
-os.makedirs(output_dir, exist_ok=True)
-save_results_to_csv(report, filename=os.path.join(output_dir, 'LS_Trans_regularization.csv'))
+# -------------------------------- Ranking ---------------------------------------
+rank_shapelets(args.dataset, version=args.shap_version)

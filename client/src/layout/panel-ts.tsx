@@ -15,7 +15,7 @@ import {useShapeData} from '@/hooks/useShapeData';
 import {useTsInstanceData} from '@/hooks/useTsInstanceData';
 import {LoadingIndicator} from '@/components/loading-indicator';
 import TsRenderer, {TsRendererMode} from '@/lib/ts-renderer';
-import {Button, ButtonGroup, Checkbox, FormControlLabel, TextField} from '@mui/material';
+import {Button, ButtonGroup, Checkbox, FormControlLabel, TextField, Slider} from '@mui/material';
 import {cn, toggleArrayItem} from '@/utils';
 import * as d3 from 'd3';
 import {colors} from '@/config/colors';
@@ -175,7 +175,7 @@ export default function PanelTs(props: IPanelTsProps) {
   return (
     <div className="w-full h-full flex flex-col gap-2 px-3 py-2">
       <div className="panel-title">Time Series Signatures</div>
-      <div className="flex flex-row gap-4">
+      <div className="flex flex-row gap-2">
         <ButtonGroup size={'small'}>
           <Button onClick={() => setMode('overview')} variant={mode === 'overview' ? 'contained' : 'outlined'}>Relationship</Button>
           <Button onClick={() => setMode('individual')} variant={mode === 'individual' ? 'contained' : 'outlined'}>Matrix</Button>
@@ -206,6 +206,23 @@ export default function PanelTs(props: IPanelTsProps) {
               }
               label="Filter Out Similar"
             />
+            {params.filterSimilar && (
+                <div className="flex flex-col items-center">
+                  <div>Threshold:</div>
+                  <Slider
+                    value={params.similarThreshold}
+                    sx={{width: '80px'}}
+                    min={0.1}
+                    max={20}
+                    size={'small'}
+                    step={0.1}
+                    valueLabelDisplay={'auto'}
+                    onChange={(e, v) => {
+                    setParams((prev) => ({...prev, similarThreshold: v as number}));
+                    }}
+                  />
+                </div>
+            )}
           </>
         )}
         <TextField

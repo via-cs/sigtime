@@ -24,7 +24,7 @@ export const paramsAtom = atom<IParams>({
   horizontalZoom: 1,
   showConnections: false,
   filterSimilar: false,
-  similarThreshold: 3,
+  similarThreshold: 1.5,
   curveType: config.defaultCurveType,
 });
 

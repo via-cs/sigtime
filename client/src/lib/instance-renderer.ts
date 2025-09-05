@@ -414,7 +414,7 @@ class InstanceRenderer {
     const ctx = this.canvasNode.getContext('2d');
 
     this.matchData.forEach((d, i) => {
-      if (d.dist > this.selection.filterThereshold) {
+      if (d.dist >= this.selection.filterThereshold) {
         return;
       }
       const ys = d.vals.map((v) => yScale(v));

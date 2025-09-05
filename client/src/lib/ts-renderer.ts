@@ -130,7 +130,9 @@ class TsRenderer {
     this.setFilteredInstances?.(instances);
     return instances;
   }
-
+  private shapeletIdFromDim = (dim: string) => parseInt(dim.replace('shapelet-', ''), 10);
+  private dimKeyFromId = (id: number) => `shapelet-${id}`;
+  private xForId = (id: number) => this.x(this.dimKeyFromId(id));
   private drawThumbnails() {
     // Draw thumbnail previews and labels for each axis
     this.dimensions.forEach((dimension, i) => {
@@ -151,7 +153,8 @@ class TsRenderer {
             .attr('id', `thumbnail-container-${shapeletId}`)
             .attr('cursor', 'pointer')
             .on('click', () => {
-              this.onClickShapelet?.(i, this.mode);
+              this.onClickShapelet?.(shapeletId, this.mode);
+              // this.onClickShapelet?.(i, this.mode);
             });
 
         const isThisShapeletFiltered = this.isFiltered && this.selection.shapelets.includes(shapeletId);
@@ -241,12 +244,19 @@ class TsRenderer {
     let densityNegMax = -Infinity;
     let densityPosMax = -Infinity;
     for (let di = 0; di < this.dimensions.length; di++) {
+      // const dimensionTfsNeg = this.filteredInstances
+      //     .filter((d) => !d.pos)
+      //     .map((d) => d.tf[di]);
+      // const dimensionTfsPos = this.filteredInstances
+      //     .filter((d) => d.pos)
+      //     .map((d) => d.tf[di]);
+      const sid = this.shapeletIdFromDim(this.dimensions[di]);
       const dimensionTfsNeg = this.filteredInstances
-          .filter((d) => !d.pos)
-          .map((d) => d.tf[di]);
+        .filter((d) => !d.pos)
+        .map((d) => d.tf[sid]);
       const dimensionTfsPos = this.filteredInstances
-          .filter((d) => d.pos)
-          .map((d) => d.tf[di]);
+        .filter((d) => d.pos)
+        .map((d) => d.tf[sid]);
 
       const kdeNeg = new KDE1d(dimensionTfsNeg, {
         bandwidth: 0.011,
@@ -322,9 +332,13 @@ class TsRenderer {
 
   private drawInstances() {
     this.filteredInstances.forEach((instance) => {
-      instance.tf.forEach((tf, i) => {
-        const x = this.x(this.dimensions[i]);
-        const y = this.overviewY(tf);
+      // instance.tf.forEach((tf, i) => {
+      this.dimensions.forEach((dim) => {
+        const sid = this.shapeletIdFromDim(dim);
+        const x = this.x(dim);
+        const y = this.overviewY(instance.tf[sid]);
+        // const x = this.x(this.dimensions[i]);
+        // const y = this.overviewY(tf);
         this.mainG.append('circle')
             .attr('cx', x)
             .attr('cy', y)
@@ -343,7 +357,9 @@ class TsRenderer {
     // draw a red bold line on the dimension with filitering turned on
     this.selection.shapelets.forEach((shapeletIdx) => {
       const shapelet = this.shapelets[shapeletIdx];
-      const x = this.x(this.dimensions[shapeletIdx]);
+      // const x = this.x(this.dimensions[shapeletIdx]);
+      const x = this.xForId(shapeletIdx);
+
       this.mainG.append('line')
           .attr('x1', x)
           .attr('y1', 0)

@@ -141,7 +141,8 @@ async def get_shape_match(
     """
     X_transformed = pd.read_csv(get_data_file(f'{dataset}/shapelet_transform.csv'))
     transformed_value = np.array(X_transformed)
-    normalized_value = (transformed_value - np.min(transformed_value)) / (np.max(transformed_value) - np.min(transformed_value))
+    # normalized_value = (transformed_value - np.min(transformed_value)) / (np.max(transformed_value) - np.min(transformed_value))
+    normalized_value = (transformed_value - np.min(transformed_value, axis=0)) / (np.max(transformed_value, axis=0) - np.min(transformed_value, axis=0) + 1e-8)
     pos_start = pd.read_csv(get_data_file(f'{dataset}/match_start.csv'))
     pos_end = pd.read_csv(get_data_file(f'{dataset}/match_end.csv'))
     X_position = []

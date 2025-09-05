@@ -31,7 +31,7 @@ export function SignatureList(props: ISignatureListProps) {
   const sortedShapelets = React.useMemo(() => {
     if (!spData) return [];
     return spData.sort((a, b) => {
-      if (selection.sortBy === 'id') return a.rank - b.rank;
+      if (selection.sortBy === 'id') return a.id - b.id;
       return b.count - a.count;
     });
   }, [spData, selection.sortBy]);

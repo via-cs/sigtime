@@ -52,6 +52,14 @@ export const datasetConfig: IDatasetConfig[] = [
     posLabel: 'Normal',
     negLabel: 'Ischemia',
   },
+  {
+    name: 'ECG5000_New',
+    displayName: 'ECG 5000 New',
+    posValue: '1',
+    negValue: '0',
+    posLabel: 'Abnormal',
+    negLabel: 'Normal',
+  },
   // {
   //   name: 'Strawberry',
   //   displayName: 'Strawberry',

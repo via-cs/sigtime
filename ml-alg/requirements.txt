@@ -3,3 +3,5 @@ numpy
 tqdm
 pandas
 scikit-learn
+tsfel
+dtw-python

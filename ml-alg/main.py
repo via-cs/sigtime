@@ -4,8 +4,8 @@ from utils.evaluation_and_save import save_results_to_csv
 import argparse
 parser = argparse.ArgumentParser()
 # ------------------------------ Input and Output -------------------------------------
-parser.add_argument('--datatype', type=str, default='private', choices={'public', 'private'})
-parser.add_argument('--dataset', type=str, default='preterm')
+parser.add_argument('--datatype', type=str, default='public', choices={'public', 'private'})
+parser.add_argument('--dataset', type=str, default='ECG200')
 parser.add_argument('--version', type=str, default='3')
 parser.add_argument('--test_ratio', type=float, default=0.2, help='Test ratio for data splitting')
 parser.add_argument('--val_ratio', type=float, default=0.2, help='Validation ratio for data splitting')

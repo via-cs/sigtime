@@ -1,14 +1,13 @@
 # SigTime
 In this repo, there are three main directories:
 ```
-- backend: the backend control of the visualization interface.
-- client: the frontend control of the visualization interface.
-- ml-alg: the model training.
+- backend: For the backend control of the visualization interface.
+- client: For the frontend control of the visualization interface.
+- ml-alg: For the model training.
 ```
 
-## quick start
+## Quick Start
 **backend**
-
 Make sure `pixi` is installed (https://pixi.sh)
 
 ```
@@ -33,13 +32,14 @@ Make sure you have Docker running.
 docker compose up
 ```
 
-The source code are mounted via docker volume, so the project is hot-reloaded. Note that you will need to rebuild the docker if you modified dependencies (eg. `pnpm i` or `pixi add`).
+The source code is mounted via Docker volume, so the project is hot-reloaded. Note that you will need to rebuild the Docker if you modified dependencies (eg, `pnpm i` or `pixi add`).
 
 
 ## ml-alg
 ### Environment
 Install the essential packages with 
 ```
+cd ml-alg
 pip install -r requirements.txt
 ```
 ### Quick start

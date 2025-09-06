@@ -21,6 +21,9 @@ export const colors = {
   highlightLight2: chroma(red[700]).alpha(0.2).hex(),
   shapes: (() => {
     const arr = chroma.scale('Set3').colors(10);
+    // const temp = arr[1];
+    // arr[1]= arr[2];
+    // arr[2] = temp;
     return arr;
   })(),
 };

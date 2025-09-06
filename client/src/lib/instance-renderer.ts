@@ -427,8 +427,8 @@ class InstanceRenderer {
       this.matchData[i].xy = _.cloneDeep(xy);
       this.matchData[i].sid = i;
       const path2d = new Path2D(path(xy));
-      const color = chroma(colors.shapes[i]).alpha(d.dist / this.selection.filterThereshold + 0.5).rgba().join(',');
-      ctx.lineWidth = 3;
+      const color = chroma(colors.shapes[i]).alpha(1).rgba().join(',');
+      ctx.lineWidth = 5;
       ctx.strokeStyle = `rgba(${color})`;
       ctx.stroke(path2d);
     });
@@ -445,7 +445,7 @@ class InstanceRenderer {
 
     // add shapelet name (in circled with bg color as colors.shape[i]) and its distance (in black text
     annotationG.append('circle')
-        .attr('r', 10)
+        .attr('r', 15)
         .attr('fill-opacity', 0.5)
         .attr('fill', (d) => colors.shapes[d.sid || 0])
         .attr('stroke', (d) => colors.shapes[d.sid || 0])
@@ -454,7 +454,7 @@ class InstanceRenderer {
     annotationG.append('text')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .attr('font-size', '11px')
+        .attr('font-size', '15px')
         .attr('fill', 'black')
         .attr('font-weight', 'bold')
         .attr('dy', '0.05em')
@@ -463,7 +463,7 @@ class InstanceRenderer {
     annotationG.append('text')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'hanging')
-        .attr('font-size', '9px')
+        .attr('font-size', '15px')
         .attr('fill', 'black')
         .attr('y', 15)
         .text((d) => d.dist !== undefined ? `${((1 - d.dist) * 100).toFixed(2)}%` : '');

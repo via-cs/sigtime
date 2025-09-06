@@ -12,14 +12,14 @@
 import {IDatasetConfig} from '@/types';
 
 export const datasetConfig: IDatasetConfig[] = [
-  // {
-  //   name: 'Robot',
-  //   displayName: 'Robot',
-  //   posValue: '1',
-  //   negValue: '0',
-  //   posLabel: 'Hard',
-  //   negLabel: 'Smooth',
-  // },
+  {
+    name: 'SonyAIBORobotSurface1_0905',
+    displayName: 'Robot',
+    posValue: '1',
+    negValue: '0',
+    posLabel: 'Smooth',
+    negLabel: 'Hard',
+  },
   // {
   //   name: 'robot_1',
   //   displayName: 'Robot FCN',
